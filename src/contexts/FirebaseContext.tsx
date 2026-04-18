@@ -21,6 +21,7 @@ import { SKPD, Anggaran, Realisasi } from '../lib/types';
 interface FirebaseContextType {
   user: User | null;
   loading: boolean;
+  dataLoading: { skpds: boolean; anggarans: boolean; realisasis: boolean };
   skpds: SKPD[];
   anggarans: Anggaran[];
   realisasis: Realisasi[];
@@ -45,6 +46,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [skpds, setSkpds] = useState<SKPD[]>([]);
   const [anggarans, setAnggarans] = useState<Anggaran[]>([]);
   const [realisasis, setRealisasis] = useState<Realisasi[]>([]);
+  const [dataLoading, setDataLoading] = useState({ skpds: true, anggarans: true, realisasis: true });
 
   useEffect(() => {
     testFirestoreConnection();
@@ -75,16 +77,76 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
-      setSkpds(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SKPD)));
-    }, (err) => handleFirestoreError(err, 'list', 'skpds'));
+      setSkpds(prev => {
+        const next = [...prev];
+        snapshot.docChanges().forEach((change) => {
+          const data = { id: change.doc.id, ...change.doc.data() } as SKPD;
+          if (change.type === 'added') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index === -1) next.push(data);
+          } else if (change.type === 'modified') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index > -1) next[index] = data;
+          } else if (change.type === 'removed') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index > -1) next.splice(index, 1);
+          }
+        });
+        return next;
+      });
+      setDataLoading(prev => ({ ...prev, skpds: false }));
+    }, (err) => {
+      console.error("SKPD Sync Error:", err);
+      setDataLoading(prev => ({ ...prev, skpds: false }));
+    });
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
-      setAnggarans(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Anggaran)));
-    }, (err) => handleFirestoreError(err, 'list', 'anggarans'));
+      setAnggarans(prev => {
+        const next = [...prev];
+        snapshot.docChanges().forEach((change) => {
+          const data = { id: change.doc.id, ...change.doc.data() } as Anggaran;
+          if (change.type === 'added') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index === -1) next.push(data);
+          } else if (change.type === 'modified') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index > -1) next[index] = data;
+          } else if (change.type === 'removed') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index > -1) next.splice(index, 1);
+          }
+        });
+        return next;
+      });
+      setDataLoading(prev => ({ ...prev, anggarans: false }));
+    }, (err) => {
+      console.error("Anggaran Sync Error:", err);
+      setDataLoading(prev => ({ ...prev, anggarans: false }));
+    });
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
-      setRealisasis(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Realisasi)));
-    }, (err) => handleFirestoreError(err, 'list', 'realisasis'));
+      setRealisasis(prev => {
+        const next = [...prev];
+        snapshot.docChanges().forEach((change) => {
+          const data = { id: change.doc.id, ...change.doc.data() } as Realisasi;
+          if (change.type === 'added') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index === -1) next.push(data);
+          } else if (change.type === 'modified') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index > -1) next[index] = data;
+          } else if (change.type === 'removed') {
+            const index = next.findIndex(i => i.id === data.id);
+            if (index > -1) next.splice(index, 1);
+          }
+        });
+        return next;
+      });
+      setDataLoading(prev => ({ ...prev, realisasis: false }));
+    }, (err) => {
+      console.error("Realisasi Sync Error:", err);
+      setDataLoading(prev => ({ ...prev, realisasis: false }));
+    });
 
     return () => {
       unsubSkpd();
@@ -199,9 +261,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <FirebaseContext.Provider value={{ 
-      user, loading, skpds, anggarans, realisasis, 
+      user, loading, dataLoading, skpds, anggarans, realisasis, 
       login, logout, 
-      saveSKPD, deleteSKPD,
+      saveSKPD, saveSKPDsBulk, deleteSKPD,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran,
       saveRealisasi, saveRealisasisBulk, deleteRealisasi
     }}>

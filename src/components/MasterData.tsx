@@ -20,7 +20,7 @@ const ITEMS_PER_PAGE = 50;
 
 export default function MasterData() {
   const { 
-    skpds, anggarans, 
+    skpds, anggarans, dataLoading,
     saveSKPDsBulk, saveAnggaransBulk, 
     deleteSKPD, deleteAnggaran 
   } = useFirebase();
@@ -206,13 +206,13 @@ export default function MasterData() {
            skpd?.nama.toLowerCase().includes(searchLower);
   }), [anggarans, skpds, search]);
 
-  // Reset page when search or tab changes
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [search, tab]);
-
   const totalItems = tab === 'skpd' ? filteredSkpds.length : filteredAnggarans.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+  // Reset page when search, tab, or total data length changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, tab, totalItems]);
   const currentData = React.useMemo(() => {
     const list = tab === 'skpd' ? filteredSkpds : filteredAnggarans;
     return list.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -301,6 +301,26 @@ export default function MasterData() {
               </tr>
             </thead>
             <tbody className="divide-y divide-bento-border">
+              {(tab === 'skpd' ? dataLoading.skpds : dataLoading.anggarans) && (
+                <tr>
+                  <td colSpan={tab === 'skpd' ? 3 : 5} className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-2 border-bento-primary border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-xs font-bold text-bento-text-sub uppercase tracking-widest animate-pulse">Sinkronisasi Cloud...</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!(tab === 'skpd' ? dataLoading.skpds : dataLoading.anggarans) && currentData.length === 0 && (
+                <tr>
+                  <td colSpan={tab === 'skpd' ? 3 : 5} className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-bento-text-sub opacity-50">
+                      <Database className="w-10 h-10" />
+                      <p className="text-sm font-medium">Belum ada data {tab === 'skpd' ? 'SKPD' : 'Anggaran'}</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {tab === 'skpd' ? (
                 currentData.map((skpd) => (
                   <tr key={skpd.id} className="hover:bg-slate-50/50 transition-all duration-200">
