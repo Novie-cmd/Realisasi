@@ -31,7 +31,7 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 
 export default function App() {
   const { 
-    user, loading, skpds, anggarans, realisasis, 
+    user, loading, syncError, skpds, anggarans, realisasis, 
     login, logout,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
@@ -163,6 +163,20 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {syncError && (
+          <div className="bg-red-50 border-b border-red-200 px-10 py-3 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <p className="text-sm font-bold text-red-700">{syncError}</p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-all"
+            >
+              Muat Ulang
+            </button>
+          </div>
+        )}
         <header className="h-20 flex items-center justify-between px-10 bg-transparent border-none sticky top-0 z-10">
           <div>
             <h2 className="text-2xl font-bold text-bento-accent tracking-tight leading-none mb-1">

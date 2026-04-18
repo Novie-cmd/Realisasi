@@ -21,6 +21,7 @@ import { SKPD, Anggaran, Realisasi } from '../lib/types';
 interface FirebaseContextType {
   user: User | null;
   loading: boolean;
+  syncError: string | null;
   dataLoading: { skpds: boolean; anggarans: boolean; realisasis: boolean };
   skpds: SKPD[];
   anggarans: Anggaran[];
@@ -46,6 +47,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [skpds, setSkpds] = useState<SKPD[]>([]);
   const [anggarans, setAnggarans] = useState<Anggaran[]>([]);
   const [realisasis, setRealisasis] = useState<Realisasi[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState({ skpds: true, anggarans: true, realisasis: true });
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
       console.error("SKPD Sync Error:", err);
+      setSyncError("Gagal sinkronisasi SKPD. Periksa koneksi atau hak akses.");
       setDataLoading(prev => ({ ...prev, skpds: false }));
     });
 
@@ -121,6 +124,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
       console.error("Anggaran Sync Error:", err);
+      setSyncError("Gagal sinkronisasi Anggaran. Periksa koneksi atau hak akses.");
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     });
 
@@ -145,6 +149,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
       console.error("Realisasi Sync Error:", err);
+      setSyncError("Gagal sinkronisasi Realisasi. Periksa koneksi atau hak akses.");
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     });
 
@@ -261,7 +266,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <FirebaseContext.Provider value={{ 
-      user, loading, dataLoading, skpds, anggarans, realisasis, 
+      user, loading, syncError, dataLoading, skpds, anggarans, realisasis, 
       login, logout, 
       saveSKPD, saveSKPDsBulk, deleteSKPD,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran,
