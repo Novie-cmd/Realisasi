@@ -23,6 +23,7 @@ export default function Transactions() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   
   const [formData, setFormData] = useState({
     anggaranId: '',
@@ -59,8 +60,9 @@ export default function Transactions() {
   const handleImportRealisasi = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsSaving(true);
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = event.target?.result;
           const workbook = XLSX.read(data, { type: 'array' });
@@ -70,6 +72,7 @@ export default function Transactions() {
           
           if (results.length === 0) {
             alert("File Excel kosong atau tidak terbaca.");
+            setIsSaving(false);
             return;
           }
 
@@ -155,16 +158,23 @@ export default function Transactions() {
             .filter((r): r is Realisasi => r !== null);
 
           if (importedData.length > 0) {
-            saveRealisasisBulk(importedData);
+            await saveRealisasisBulk(importedData);
             alert(`Berhasil mengimpor ${importedData.length} data Realisasi.`);
           } else {
             const keys = Object.keys(results[0]).join(', ');
             alert(`Gagal Impor Realisasi.\n\nKolom ditemukan: [${keys}]\n\nPastikan ada kolom:\n- Kode SKPD\n- Kode Rekening\n- Jumlah\n\nSerta pastikan data tersebut sudah ada di Data Master (Anggaran).`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Import error:", error);
-          alert("Gagal membaca file Excel.");
+          alert(`Gagal membaca file Excel: ${error.message || 'Format tidak dikenal'}`);
+        } finally {
+          setIsSaving(false);
+          if (e.target) e.target.value = '';
         }
+      };
+      reader.onerror = () => {
+        alert("Gagal membaca file.");
+        setIsSaving(false);
       };
       reader.readAsArrayBuffer(file);
     }
@@ -189,15 +199,28 @@ export default function Transactions() {
               className="pl-10 pr-4 py-2.5 bg-white border border-bento-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-bento-primary/20 focus:border-bento-primary w-full sm:w-64 transition-all"
             />
           </div>
-          <label className="flex items-center gap-2 px-5 py-2.5 bg-bento-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 cursor-pointer transition-all shadow-sm">
-            <Upload className="w-4 h-4" />
-            <span>Import</span>
-            <input 
-              type="file" 
-              accept=".xlsx,.xls" 
-              className="hidden" 
-              onChange={handleImportRealisasi}
-            />
+          <label className={cn(
+            "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm",
+            isSaving ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
+          )}>
+            {isSaving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>Sinkronisasi...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                <span>Import</span>
+                <input 
+                  type="file" 
+                  accept=".xlsx,.xls" 
+                  className="hidden" 
+                  disabled={isSaving}
+                  onChange={handleImportRealisasi}
+                />
+              </>
+            )}
           </label>
           <button 
             onClick={() => setShowAdd(true)}

@@ -28,12 +28,14 @@ export default function MasterData() {
   const [tab, setTab] = useState<'skpd' | 'anggaran'>('skpd');
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleImportSKPD = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsSaving(true);
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = event.target?.result;
           const workbook = XLSX.read(data, { type: 'array' });
@@ -43,6 +45,7 @@ export default function MasterData() {
           
           if (results.length === 0) {
             alert("File Excel kosong atau tidak terbaca.");
+            setIsSaving(false);
             return;
           }
 
@@ -64,7 +67,7 @@ export default function MasterData() {
             }));
 
           if (newData.length > 0) {
-            saveSKPDsBulk(newData);
+            await saveSKPDsBulk(newData);
             alert(`Berhasil mengimpor ${newData.length} data SKPD.`);
           } else {
             const detectedKeys = results[0] ? Object.keys(results[0]).join(', ') : 'File kosong';
@@ -73,6 +76,9 @@ export default function MasterData() {
         } catch (error: any) {
           console.error("Import error:", error);
           alert(`Gagal membaca file Excel: ${error.message || 'Error tidak diketahui'}`);
+        } finally {
+          setIsSaving(false);
+          if (e.target) e.target.value = '';
         }
       };
       reader.readAsArrayBuffer(file);
@@ -82,8 +88,9 @@ export default function MasterData() {
   const handleImportAnggaran = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsSaving(true);
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = event.target?.result;
           const workbook = XLSX.read(data, { type: 'array' });
@@ -93,6 +100,7 @@ export default function MasterData() {
           
           if (results.length === 0) {
             alert("File Excel kosong atau tidak terbaca.");
+            setIsSaving(false);
             return;
           }
 
@@ -174,7 +182,7 @@ export default function MasterData() {
             });
 
           if (newData.length > 0) {
-            saveAnggaransBulk(newData);
+            await saveAnggaransBulk(newData);
             alert(`Berhasil mengimpor ${newData.length} data Anggaran.`);
           } else {
             const detectedKeys = Object.keys(results[0]).join(', ');
@@ -183,6 +191,9 @@ export default function MasterData() {
         } catch (error) {
           console.error("Import error:", error);
           alert("Gagal membaca file Excel. Pastikan file dalam format .xlsx atau .xls.");
+        } finally {
+          setIsSaving(false);
+          if (e.target) e.target.value = '';
         }
       };
       reader.onerror = () => alert("Gagal membaca file.");
@@ -254,13 +265,26 @@ export default function MasterData() {
               className="pl-10 pr-4 py-2.5 bg-white border border-bento-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-bento-primary/20 focus:border-bento-primary w-full sm:w-64 transition-all"
             />
           </div>
-          <label className="flex items-center gap-2 px-5 py-2.5 bg-bento-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 cursor-pointer transition-all shadow-sm">
-            <Upload className="w-4 h-4" />
-            <span>Import</span>
+          <label className={cn(
+            "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm",
+            isSaving ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
+          )}>
+            {isSaving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>Sinkronisasi...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                <span>Import</span>
+              </>
+            )}
             <input 
               type="file" 
               accept=".xlsx,.xls" 
               className="hidden" 
+              disabled={isSaving}
               onChange={tab === 'skpd' ? handleImportSKPD : handleImportAnggaran}
             />
           </label>
