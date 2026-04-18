@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, cn } from '../lib/utils';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 interface Props {
   anggarans: Anggaran[];
@@ -185,7 +185,10 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-all duration-200">
                     <td className="px-8 py-5 text-bento-text-sub font-mono font-bold">
-                      {format(new Date(item.tanggal), 'dd/MM/yyyy')}
+                      {(() => {
+                        const d = new Date(item.tanggal);
+                        return isValid(d) ? format(d, 'dd/MM/yyyy') : item.tanggal;
+                      })()}
                     </td>
                     <td className="px-8 py-5">
                       <div className="flex flex-col">

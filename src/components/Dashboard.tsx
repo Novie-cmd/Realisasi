@@ -33,8 +33,8 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function Dashboard({ skpds, anggarans, realisasis }: Props) {
   const stats = useMemo(() => {
-    const totalAnggaran = anggarans.reduce((sum, item) => sum + item.pagu, 0);
-    const totalRealisasi = realisasis.reduce((sum, item) => sum + item.nilai, 0);
+    const totalAnggaran = anggarans.reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
+    const totalRealisasi = realisasis.reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
     const totalSisa = totalAnggaran - totalRealisasi;
     const persentase = totalAnggaran > 0 ? totalRealisasi / totalAnggaran : 0;
 
@@ -42,17 +42,18 @@ export default function Dashboard({ skpds, anggarans, realisasis }: Props) {
   }, [anggarans, realisasis]);
 
   const chartData = useMemo(() => {
+    if (skpds.length === 0) return [];
     return skpds.map(skpd => {
       const skpdAnggaran = anggarans
         .filter(a => a.skpdId === skpd.id)
-        .reduce((sum, item) => sum + item.pagu, 0);
+        .reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
       
       const skpdRealisasi = realisasis
         .filter(r => {
           const anggaran = anggarans.find(a => a.id === r.anggaranId);
           return anggaran?.skpdId === skpd.id;
         })
-        .reduce((sum, item) => sum + item.nilai, 0);
+        .reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
 
       return {
         nama: skpd.nama,
@@ -60,7 +61,7 @@ export default function Dashboard({ skpds, anggarans, realisasis }: Props) {
         Realisasi: skpdRealisasi,
         Sisa: skpdAnggaran - skpdRealisasi
       };
-    }).sort((a, b) => b.Anggaran - a.Anggaran).slice(0, 5);
+    }).sort((a, b) => (b.Anggaran || 0) - (a.Anggaran || 0)).slice(0, 5);
   }, [skpds, anggarans, realisasis]);
 
   const pieData = useMemo(() => {

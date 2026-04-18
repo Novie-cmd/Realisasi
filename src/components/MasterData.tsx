@@ -20,6 +20,17 @@ interface Props {
   setAnggarans: React.Dispatch<React.SetStateAction<Anggaran[]>>;
 }
 
+const generateId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+  } catch (e) {
+    // Fallback if crypto is not available in non-secure context
+  }
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }: Props) {
   const [tab, setTab] = useState<'skpd' | 'anggaran'>('skpd');
   const [search, setSearch] = useState('');
@@ -29,22 +40,43 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const results = XLSX.utils.sheet_to_json(sheet);
-        
-        const newData: SKPD[] = (results as any[])
-          .filter((row: any) => row.kode && row.nama)
-          .map((row: any) => ({
-            id: crypto.randomUUID(),
-            kode: String(row.kode),
-            nama: String(row.nama),
-          }));
-        setSkpds(prev => [...prev, ...newData]);
+        try {
+          const data = event.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const results = XLSX.utils.sheet_to_json(sheet) as any[];
+          
+          const newData: SKPD[] = results
+            .map((row: any) => {
+              const normalizedRow: any = {};
+              Object.keys(row).forEach(key => {
+                const k = key.toLowerCase().trim();
+                if (k.includes('kode')) normalizedRow.kode = row[key];
+                if (k.includes('nama') || k.includes('skpd')) normalizedRow.nama = row[key];
+              });
+              return normalizedRow;
+            })
+            .filter((row: any) => row.kode != null && row.nama != null)
+            .map((row: any) => ({
+              id: generateId(),
+              kode: String(row.kode).trim(),
+              nama: String(row.nama).trim(),
+            }));
+
+          if (newData.length > 0) {
+            setSkpds(prev => [...prev, ...newData]);
+            alert(`Berhasil mengimpor ${newData.length} data SKPD.`);
+          } else {
+            const firstRow = results[0] ? Object.keys(results[0]).join(', ') : 'File kosong';
+            alert(`Tidak ada data valid ditemukan.\n\nHeader yang terbaca: ${firstRow}\n\nPastikan ada kolom: 'kode' dan 'nama'.`);
+          }
+        } catch (error) {
+          console.error("Import error:", error);
+          alert("Gagal membaca file Excel.");
+        }
       };
-      reader.readAsBinaryString(file);
+      reader.readAsArrayBuffer(file);
     }
   };
 
@@ -53,27 +85,109 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const results = XLSX.utils.sheet_to_json(sheet);
-        
-        const newData: Anggaran[] = (results as any[])
-          .filter((row: any) => row.skpdKode && row.kodeAkun && row.pagu)
-          .map((row: any) => {
-            const skpd = skpds.find(s => s.kode === String(row.skpdKode));
-            return {
-              id: crypto.randomUUID(),
-              skpdId: skpd?.id || '',
-              kodeAkun: String(row.kodeAkun),
-              namaAkun: String(row.namaAkun || 'No Name'),
-              pagu: Number(row.pagu),
-            };
-          });
-        setAnggarans(prev => [...prev, ...newData]);
+        try {
+          const data = event.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const results = XLSX.utils.sheet_to_json(sheet) as any[];
+          
+          if (results.length === 0) {
+            alert("File Excel kosong atau tidak terbaca.");
+            return;
+          }
+
+          const newData: Anggaran[] = results
+            .map((row: any) => {
+              const normalizedRow: any = {};
+              Object.keys(row).forEach(key => {
+                // Remove spaces and make lowercase for very robust matching
+                const k = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                
+                if (k.includes('kodeskpd')) normalizedRow.skpd_kode = row[key];
+                if (k.includes('koderekening') || k.includes('kodeakun')) normalizedRow.kode_akun = row[key];
+                if ((k === 'rekening' || k === 'namaakun') || (k.includes('rekening') && !k.includes('kode'))) normalizedRow.nama_akun = row[key];
+                if (k === 'jumlah' || k === 'pagu' || k.includes('jumlah') || k.includes('pagu')) normalizedRow.jumlah = row[key];
+                if (k.includes('kodeprogram')) normalizedRow.kode_program = row[key];
+                if (k === 'program' || (k.includes('program') && !k.includes('kode'))) normalizedRow.program = row[key];
+                if (k.includes('kodekegiatan') && !k.includes('sub')) normalizedRow.kode_kegiatan = row[key];
+                if (k === 'kegiatan' || (k.includes('kegiatan') && !k.includes('sub') && !k.includes('kode'))) normalizedRow.kegiatan = row[key];
+                if (k.includes('kodesub') || k.includes('kodesubkeg')) normalizedRow.kode_sub = row[key];
+                if (k.includes('subkeg') && !k.includes('kode')) normalizedRow.sub = row[key];
+              });
+              return normalizedRow;
+            })
+            .filter((row: any) => {
+              // Row is valid if it has at least localized skpd_kode, kode_akun, and a numeric-like jumlah
+              return row.skpd_kode != null && row.kode_akun != null && row.jumlah != null;
+            })
+            .map((row: any) => {
+              const targetSkpdKode = String(row.skpd_kode).trim();
+              const skpd = skpds.find(s => s.kode === targetSkpdKode);
+              
+              // Clean numeric values (remove currency symbols, handle Indonesian formats)
+              let amount = 0;
+              if (typeof row.jumlah === 'number') {
+                amount = row.jumlah;
+              } else {
+                // Handle Indonesian format: dots as thousand separator, comma as decimal
+                // First, remove any currency labels or spaces
+                let cleanVal = String(row.jumlah).replace(/[Rp\s]/gi, '');
+                
+                // If there are both dots and commas, it's definitely formatted (e.g. 1.234,56)
+                if (cleanVal.includes('.') && cleanVal.includes(',')) {
+                  cleanVal = cleanVal.replace(/\./g, '').replace(',', '.');
+                } 
+                // If only dots, could be thousand sep (1.000.000) or decimal (1.23)
+                else if (cleanVal.includes('.') && !cleanVal.includes(',')) {
+                   // If multiple dots, it's thousand separators (1.000.000)
+                   if ((cleanVal.match(/\./g) || []).length > 1) {
+                     cleanVal = cleanVal.replace(/\./g, '');
+                   }
+                   // If one dot and 3 digits after, it's likely thousand sep (1.000)
+                   else if (cleanVal.split('.')[1].length === 3) {
+                     cleanVal = cleanVal.replace('.', '');
+                   }
+                }
+                // If only comma, it's likely decimal
+                else if (cleanVal.includes(',') && !cleanVal.includes('.')) {
+                  cleanVal = cleanVal.replace(',', '.');
+                }
+
+                amount = Number(cleanVal.replace(/[^0-9.-]+/g, ""));
+              }
+
+              if (isNaN(amount)) amount = 0;
+
+              return {
+                id: generateId(),
+                skpdId: skpd?.id || '',
+                kodeProgram: String(row.kode_program || '').trim(),
+                namaProgram: String(row.program || '').trim(),
+                kodeKegiatan: String(row.kode_kegiatan || '').trim(),
+                namaKegiatan: String(row.kegiatan || '').trim(),
+                kodeSubKegiatan: String(row.kode_sub || '').trim(),
+                namaSubKegiatan: String(row.sub || '').trim(),
+                kodeAkun: String(row.kode_akun).trim(),
+                namaAkun: String(row.nama_akun || 'No Name').trim(),
+                pagu: amount,
+              };
+            });
+
+          if (newData.length > 0) {
+            setAnggarans(prev => [...prev, ...newData]);
+            alert(`Berhasil mengimpor ${newData.length} data Anggaran.`);
+          } else {
+            const detectedKeys = Object.keys(results[0]).join(', ');
+            alert(`Gagal Impor Anggaran.\n\nKolom yang ditemukan di Excel: [${detectedKeys}]\n\nPastikan ada kolom dengan nama:\n- "Kode SKPD"\n- "Kode Rekening"\n- "Jumlah"`);
+          }
+        } catch (error) {
+          console.error("Import error:", error);
+          alert("Gagal membaca file Excel. Pastikan file dalam format .xlsx atau .xls.");
+        }
       };
-      reader.readAsBinaryString(file);
+      reader.onerror = () => alert("Gagal membaca file.");
+      reader.readAsArrayBuffer(file);
     }
   };
 
@@ -84,8 +198,13 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
 
   const filteredAnggarans = anggarans.filter(a => {
     const skpd = skpds.find(s => s.id === a.skpdId);
-    return a.namaAkun.toLowerCase().includes(search.toLowerCase()) || 
-           skpd?.nama.toLowerCase().includes(search.toLowerCase());
+    const searchLower = search.toLowerCase();
+    return a.namaAkun.toLowerCase().includes(searchLower) || 
+           a.kodeAkun.toLowerCase().includes(searchLower) ||
+           (a.namaProgram || '').toLowerCase().includes(searchLower) ||
+           (a.namaKegiatan || '').toLowerCase().includes(searchLower) ||
+           (a.namaSubKegiatan || '').toLowerCase().includes(searchLower) ||
+           skpd?.nama.toLowerCase().includes(searchLower);
   });
 
   return (
@@ -113,6 +232,17 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
         </div>
 
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => {
+              if(confirm(`Hapus semua data ${tab === 'skpd' ? 'SKPD' : 'Anggaran'}?`)) {
+                tab === 'skpd' ? setSkpds([]) : setAnggarans([]);
+              }
+            }}
+            className="p-2.5 bg-red-50 text-bento-danger border border-red-100 rounded-xl hover:bg-red-100 transition-all shadow-sm flex items-center justify-center"
+            title="Hapus Semua Data"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-sub" />
             <input 
@@ -144,12 +274,24 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">
                   {tab === 'skpd' ? 'ID Unit' : 'Unit Kerja'}
                 </th>
-                <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">
-                  {tab === 'skpd' ? 'Nama Unit' : 'Kode Akun & Nama'}
-                </th>
+                {tab === 'anggaran' && (
+                  <>
+                    <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">
+                      Program / Kegiatan
+                    </th>
+                    <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">
+                      Sub Kegiatan / Rekening
+                    </th>
+                  </>
+                )}
+                {tab === 'skpd' && (
+                  <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">
+                    Nama Unit
+                  </th>
+                )}
                 {tab === 'anggaran' && (
                   <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest text-right">
-                    Pagu Anggaran
+                    Pagu (Rp)
                   </th>
                 )}
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest text-right">
@@ -178,22 +320,41 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
                   const skpd = skpds.find(s => s.id === anggaran.skpdId);
                   return (
                     <tr key={anggaran.id} className="hover:bg-slate-50/50 transition-all duration-200">
-                      <td className="px-8 py-5">
+                      <td className="px-8 py-5 align-top">
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-bento-accent">{skpd?.nama || 'Tanpa Unit'}</span>
+                          <span className="text-sm font-bold text-bento-accent leading-tight">{skpd?.nama || 'Tanpa Unit'}</span>
                           <span className="text-[10px] font-bold text-bento-text-sub uppercase tracking-tighter">{skpd?.kode}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-5">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-bento-accent">{anggaran.namaAkun}</span>
-                          <span className="text-[11px] font-mono font-medium text-bento-text-sub">{anggaran.kodeAkun}</span>
+                      <td className="px-8 py-5 align-top">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-bento-text-sub uppercase tracking-tighter">Program</span>
+                            <span className="text-xs font-bold text-bento-accent">{anggaran.namaProgram || '-'}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-bento-text-sub uppercase tracking-tighter">Kegiatan</span>
+                            <span className="text-xs font-medium text-bento-accent">{anggaran.namaKegiatan || '-'}</span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-8 py-5 text-sm font-bold text-right text-bento-accent">
+                      <td className="px-8 py-5 align-top">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-bento-text-sub uppercase tracking-tighter">Sub Kegiatan</span>
+                            <span className="text-xs font-medium text-bento-accent">{anggaran.namaSubKegiatan || '-'}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-bento-text-sub uppercase tracking-tighter text-bento-primary">Rekening</span>
+                            <span className="text-sm font-bold text-bento-primary">{anggaran.namaAkun}</span>
+                            <span className="text-[11px] font-mono font-medium text-bento-text-sub">{anggaran.kodeAkun}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5 text-sm font-black text-right text-bento-accent align-top">
                         {formatIDR(anggaran.pagu)}
                       </td>
-                      <td className="px-8 py-5 text-sm text-right">
+                      <td className="px-8 py-5 text-sm text-right align-top">
                         <button 
                           onClick={() => setAnggarans(prev => prev.filter(a => a.id !== anggaran.id))}
                           className="text-bento-text-sub hover:text-bento-danger transition-colors p-2 rounded-lg hover:bg-red-50"
@@ -207,7 +368,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
               )}
               {(tab === 'skpd' ? filteredSkpds : filteredAnggarans).length === 0 && (
                 <tr>
-                  <td colSpan={tab === 'skpd' ? 3 : 4} className="px-8 py-20 text-center">
+                  <td colSpan={tab === 'skpd' ? 3 : 5} className="px-8 py-20 text-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-bento-border border-dashed">
                       <Database className="w-7 h-7 text-bento-text-sub/40" />
                     </div>
@@ -231,8 +392,8 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
           <p className="text-xs text-bento-text-sub leading-relaxed">
             Pastikan header file sesuai dengan kriteria berikut agar proses sinkronisasi berjalan normal.
           </p>
-          <div className="mt-3 inline-block px-3 py-1.5 bg-slate-50 border border-bento-border rounded-lg font-mono text-[11px] text-bento-primary font-bold">
-            {tab === 'skpd' ? 'kode, nama' : 'skpdKode, kodeAkun, namaAkun, pagu'}
+          <div className="mt-3 inline-block px-3 py-1.5 bg-slate-50 border border-bento-border rounded-lg font-mono text-[10px] text-bento-primary font-bold overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
+            {tab === 'skpd' ? 'kode, nama' : 'Kode SKPD, SKPD, Kode Program, Program, Kode Kegiatan, Kegiatan, Kode Sub Kegaitan, Sub Kegiatan, Kode Rekening, Rekening, Jumlah'}
           </div>
         </div>
       </div>

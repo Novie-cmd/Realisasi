@@ -7,6 +7,12 @@ export interface SKPD {
 export interface Anggaran {
   id: string;
   skpdId: string;
+  kodeProgram?: string;
+  namaProgram?: string;
+  kodeKegiatan?: string;
+  namaKegiatan?: string;
+  kodeSubKegiatan?: string;
+  namaSubKegiatan?: string;
   kodeAkun: string;
   namaAkun: string;
   pagu: number; // Planned budget

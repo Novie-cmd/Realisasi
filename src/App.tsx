@@ -79,9 +79,13 @@ export default function App() {
 
   // Sync with storage
   useEffect(() => {
-    localStorage.setItem('skpds', JSON.stringify(skpds));
-    localStorage.setItem('anggarans', JSON.stringify(anggarans));
-    localStorage.setItem('realisasis', JSON.stringify(realisasis));
+    try {
+      localStorage.setItem('skpds', JSON.stringify(skpds));
+      localStorage.setItem('anggarans', JSON.stringify(anggarans));
+      localStorage.setItem('realisasis', JSON.stringify(realisasis));
+    } catch (e) {
+      console.warn('Storage limit reached, changes will not persist after refresh:', e);
+    }
   }, [skpds, anggarans, realisasis]);
 
   const navItems = [
