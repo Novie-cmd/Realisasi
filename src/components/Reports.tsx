@@ -13,7 +13,7 @@ import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, formatPercent, cn } from '../lib/utils';
 import { useFirebase } from '../contexts/FirebaseContext';
 
-type ReportType = 'skpd' | 'akun';
+type ReportType = 'skpd' | 'program' | 'kegiatan' | 'sub' | 'akun';
 
 export default function Reports() {
   const { skpds, anggarans, realisasis } = useFirebase();
@@ -42,23 +42,47 @@ export default function Reports() {
         };
       }).sort((a, b) => b.pagu - a.pagu);
     } else {
-      // Group by account name
-      const accounts: Record<string, { pagu: number, realisasi: number, kode: string }> = {};
+      // Group by various hierarchical levels
+      const groups: Record<string, { pagu: number, realisasi: number, kode: string }> = {};
       
       anggarans.forEach(a => {
-        if (!accounts[a.namaAkun]) accounts[a.namaAkun] = { pagu: 0, realisasi: 0, kode: a.kodeAkun };
-        accounts[a.namaAkun].pagu += a.pagu;
+        let label = '';
+        let kode = '';
+        
+        if (type === 'program') {
+          label = a.namaProgram || 'No Program';
+          kode = a.kodeProgram;
+        } else if (type === 'kegiatan') {
+          label = a.namaKegiatan || 'No Kegiatan';
+          kode = a.kodeKegiatan;
+        } else if (type === 'sub') {
+          label = a.namaSubKegiatan || 'No Sub Kegiatan';
+          kode = a.kodeSubKegiatan;
+        } else if (type === 'akun') {
+          label = a.namaAkun || 'No Rekening';
+          kode = a.kodeAkun;
+        }
+
+        if (!groups[label]) groups[label] = { pagu: 0, realisasi: 0, kode: kode };
+        groups[label].pagu += a.pagu;
       });
 
       realisasis.forEach(r => {
         const a = anggarans.find(ang => ang.id === r.anggaranId);
         if (a) {
-          if (!accounts[a.namaAkun]) accounts[a.namaAkun] = { pagu: 0, realisasi: 0, kode: a.kodeAkun };
-          accounts[a.namaAkun].realisasi += r.nilai;
+          let label = '';
+          if (type === 'program') label = a.namaProgram || 'No Program';
+          else if (type === 'kegiatan') label = a.namaKegiatan || 'No Kegiatan';
+          else if (type === 'sub') label = a.namaSubKegiatan || 'No Sub Kegiatan';
+          else if (type === 'akun') label = a.namaAkun || 'No Rekening';
+
+          if (groups[label]) {
+            groups[label].realisasi += r.nilai;
+          }
         }
       });
 
-      return Object.entries(accounts).map(([label, data]) => ({
+      return Object.entries(groups).map(([label, data]) => ({
         id: label,
         label,
         sublabel: data.kode,
@@ -81,24 +105,51 @@ export default function Reports() {
   return (
     <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex bg-bento-border/30 p-1 rounded-xl border border-bento-border w-fit">
+        <div className="flex flex-wrap bg-bento-border/30 p-1 rounded-xl border border-bento-border w-fit gap-1">
           <button 
             onClick={() => setType('skpd')}
             className={cn(
-               "px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+               "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
               type === 'skpd' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
             )}
           >
-            Laporan per SKPD
+            SKPD
+          </button>
+          <button 
+            onClick={() => setType('program')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+              type === 'program' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+            )}
+          >
+            Program
+          </button>
+          <button 
+            onClick={() => setType('kegiatan')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+              type === 'kegiatan' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+            )}
+          >
+            Kegiatan
+          </button>
+          <button 
+            onClick={() => setType('sub')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+              type === 'sub' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+            )}
+          >
+            Sub Kegiatan
           </button>
           <button 
             onClick={() => setType('akun')}
             className={cn(
-              "px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
               type === 'akun' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
             )}
           >
-            Laporan per Akun
+            Rekening
           </button>
         </div>
 
@@ -118,7 +169,13 @@ export default function Reports() {
               LAPORAN REALISASI ANGGARAN
             </h2>
             <p className="text-sm text-bento-text-sub font-bold mt-1 uppercase tracking-widest">
-              {type === 'skpd' ? 'BASIS UNIT KERJA (SKPD)' : 'BASIS MATA ANGGARAN (AKUN)'} • 2026
+              Basis {
+                type === 'skpd' ? 'Unit Kerja (SKPD)' : 
+                type === 'program' ? 'Program' : 
+                type === 'kegiatan' ? 'Kegiatan' : 
+                type === 'sub' ? 'Sub Kegiatan' : 
+                'Mata Anggaran (Rekening)'
+              } • 2026
             </p>
           </div>
           <div className="text-right">
@@ -134,7 +191,13 @@ export default function Reports() {
             <thead>
               <tr className="bg-slate-50">
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest border-b border-bento-border">
-                  {type === 'skpd' ? 'Unit / Dinas' : 'Uraian Akun Belanja'}
+                  {
+                    type === 'skpd' ? 'Unit / Dinas' : 
+                    type === 'program' ? 'Uraian Program' : 
+                    type === 'kegiatan' ? 'Uraian Kegiatan' : 
+                    type === 'sub' ? 'Uraian Sub Kegiatan' : 
+                    'Uraian Rekening Belanja'
+                  }
                 </th>
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest border-b border-bento-border text-right">
                   Pagu
