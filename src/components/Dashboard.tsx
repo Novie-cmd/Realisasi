@@ -22,16 +22,12 @@ import {
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, formatPercent, cn } from '../lib/utils';
 import { motion } from 'motion/react';
-
-interface Props {
-  skpds: SKPD[];
-  anggarans: Anggaran[];
-  realisasis: Realisasi[];
-}
+import { useFirebase } from '../contexts/FirebaseContext';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
-export default function Dashboard({ skpds, anggarans, realisasis }: Props) {
+export default function Dashboard() {
+  const { skpds, anggarans, realisasis } = useFirebase();
   const stats = useMemo(() => {
     const totalAnggaran = anggarans.reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
     const totalRealisasi = realisasis.reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);

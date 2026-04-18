@@ -14,17 +14,17 @@ import {
 import * as XLSX from 'xlsx';
 import { SKPD, Anggaran } from '../lib/types';
 import { cn, formatIDR, generateId } from '../lib/utils';
-
-interface Props {
-  skpds: SKPD[];
-  setSkpds: React.Dispatch<React.SetStateAction<SKPD[]>>;
-  anggarans: Anggaran[];
-  setAnggarans: React.Dispatch<React.SetStateAction<Anggaran[]>>;
-}
+import { useFirebase } from '../contexts/FirebaseContext';
 
 const ITEMS_PER_PAGE = 50;
 
-export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }: Props) {
+export default function MasterData() {
+  const { 
+    skpds, anggarans, 
+    saveSKPDsBulk, saveAnggaransBulk, 
+    deleteSKPD, deleteAnggaran 
+  } = useFirebase();
+
   const [tab, setTab] = useState<'skpd' | 'anggaran'>('skpd');
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,7 +59,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
             }));
 
           if (newData.length > 0) {
-            setSkpds(prev => [...prev, ...newData]);
+            saveSKPDsBulk(newData);
             alert(`Berhasil mengimpor ${newData.length} data SKPD.`);
           } else {
             const firstRow = results[0] ? Object.keys(results[0]).join(', ') : 'File kosong';
@@ -169,7 +169,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
             });
 
           if (newData.length > 0) {
-            setAnggarans(prev => [...prev, ...newData]);
+            saveAnggaransBulk(newData);
             alert(`Berhasil mengimpor ${newData.length} data Anggaran.`);
           } else {
             const detectedKeys = Object.keys(results[0]).join(', ');
@@ -238,17 +238,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
         </div>
 
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => {
-              if(confirm(`Hapus semua data ${tab === 'skpd' ? 'SKPD' : 'Anggaran'}?`)) {
-                tab === 'skpd' ? setSkpds([]) : setAnggarans([]);
-              }
-            }}
-            className="p-2.5 bg-red-50 text-bento-danger border border-red-100 rounded-xl hover:bg-red-100 transition-all shadow-sm flex items-center justify-center"
-            title="Hapus Semua Data"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {/* Bulk delete removed for safety in Firebase environment */}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-sub" />
             <input 
@@ -313,7 +303,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
                     <td className="px-8 py-5 text-sm font-bold text-bento-accent">{skpd.nama}</td>
                     <td className="px-8 py-5 text-sm text-right">
                       <button 
-                        onClick={() => setSkpds(prev => prev.filter(s => s.id !== skpd.id))}
+                        onClick={() => deleteSKPD(skpd.id)}
                         className="text-bento-text-sub hover:text-bento-danger transition-colors p-2 rounded-lg hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -362,7 +352,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
                       </td>
                       <td className="px-8 py-5 text-sm text-right align-top">
                         <button 
-                          onClick={() => setAnggarans(prev => prev.filter(a => a.id !== anggaran.id))}
+                          onClick={() => deleteAnggaran(anggaran.id)}
                           className="text-bento-text-sub hover:text-bento-danger transition-colors p-2 rounded-lg hover:bg-red-50"
                         >
                           <Trash2 className="w-4 h-4" />

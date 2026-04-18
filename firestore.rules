@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validators ---
+    
+    function isValidSKPD(data) {
+      return data.keys().hasAll(['kode', 'nama']) && 
+             data.keys().size() == 2 &&
+             data.kode is string && data.kode.size() <= 50 &&
+             data.nama is string && data.nama.size() <= 200;
+    }
+
+    function isValidAnggaran(data) {
+      return data.keys().hasAll(['skpdId', 'kodeProgram', 'namaProgram', 'kodeKegiatan', 'namaKegiatan', 'kodeSubKegiatan', 'namaSubKegiatan', 'kodeAkun', 'namaAkun', 'pagu']) &&
+             data.skpdId is string &&
+             data.kodeAkun is string &&
+             data.pagu is number && data.pagu >= 0 &&
+             exists(/databases/$(database)/documents/skpds/$(data.skpdId));
+    }
+
+    function isValidRealisasi(data) {
+      return data.keys().hasAll(['anggaranId', 'tanggal', 'nilai', 'keterangan']) &&
+             data.anggaranId is string &&
+             data.tanggal is string && data.tanggal.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.nilai is number && data.nilai >= 0 &&
+             data.keterangan is string && data.keterangan.size() <= 1000 &&
+             exists(/databases/$(database)/documents/anggarans/$(data.anggaranId));
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['email']) &&
+             data.email is string && data.email == request.auth.token.email;
+    }
+
+    // --- Match Groups ---
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isValidUserProfile(incoming());
+    }
+
+    match /skpds/{skpdId} {
+      allow read: if isSignedIn();
+      allow create: if isVerified() && isValidSKPD(incoming());
+      allow update: if isVerified() && isValidSKPD(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['kode', 'nama'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /anggarans/{anggaranId} {
+      allow read: if isSignedIn();
+      allow create: if isVerified() && isValidAnggaran(incoming());
+      allow update: if isVerified() && isValidAnggaran(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['skpdId', 'kodeProgram', 'namaProgram', 'kodeKegiatan', 'namaKegiatan', 'kodeSubKegiatan', 'namaSubKegiatan', 'kodeAkun', 'namaAkun', 'pagu'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /realisasis/{realisasiId} {
+      allow read: if isSignedIn();
+      allow create: if isVerified() && isValidRealisasi(incoming());
+      allow update: if isVerified() && isValidRealisasi(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['anggaranId', 'tanggal', 'nilai', 'keterangan'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Internal connection test
+    match /test/connection {
+       allow get: if true;
+    }
+  }
+}

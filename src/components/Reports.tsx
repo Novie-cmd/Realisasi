@@ -11,16 +11,12 @@ import {
 import { format } from 'date-fns';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, formatPercent, cn } from '../lib/utils';
-
-interface Props {
-  skpds: SKPD[];
-  anggarans: Anggaran[];
-  realisasis: Realisasi[];
-}
+import { useFirebase } from '../contexts/FirebaseContext';
 
 type ReportType = 'skpd' | 'akun';
 
-export default function Reports({ skpds, anggarans, realisasis }: Props) {
+export default function Reports() {
+  const { skpds, anggarans, realisasis } = useFirebase();
   const [type, setType] = useState<ReportType>('skpd');
 
   const reportData = useMemo(() => {

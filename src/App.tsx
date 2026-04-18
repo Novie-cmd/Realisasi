@@ -14,7 +14,9 @@ import {
   ArrowRightLeft,
   Settings,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  User as UserIcon,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SKPD, Anggaran, Realisasi } from './lib/types';
@@ -23,70 +25,21 @@ import MasterData from './components/MasterData';
 import Transactions from './components/Transactions';
 import Reports from './components/Reports';
 import { cn } from './lib/utils';
+import { useFirebase } from './contexts/FirebaseContext';
 
 type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 
 export default function App() {
+  const { 
+    user, loading, skpds, anggarans, realisasis, 
+    login, logout,
+    saveSKPD, deleteSKPD,
+    saveAnggaran, saveAnggaransBulk, deleteAnggaran,
+    saveRealisasi, saveRealisasisBulk, deleteRealisasi
+  } = useFirebase();
+
   const [activePage, setActivePage] = useState<Page>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  
-  const [skpds, setSkpds] = useState<SKPD[]>([]);
-  const [anggarans, setAnggarans] = useState<Anggaran[]>([]);
-  const [realisasis, setRealisasis] = useState<Realisasi[]>([]);
-
-  // Load initial data
-  useEffect(() => {
-    const savedSkpds = localStorage.getItem('skpds');
-    const savedAnggarans = localStorage.getItem('anggarans');
-    const savedRealisasis = localStorage.getItem('realisasis');
-
-    if (savedSkpds) {
-      setSkpds(JSON.parse(savedSkpds));
-    } else {
-      // Sample SKPD
-      const sampleSKPD = [
-        { id: '1', kode: 'SKPD.01', nama: 'Dinas Pendidikan' },
-        { id: '2', kode: 'SKPD.02', nama: 'Dinas Kesehatan' }
-      ];
-      setSkpds(sampleSKPD);
-    }
-
-    if (savedAnggarans) {
-      setAnggarans(JSON.parse(savedAnggarans));
-    } else {
-      // Sample Anggaran
-      const sampleAnggaran = [
-        { id: 'a1', skpdId: '1', kodeAkun: '5.1.01', namaAkun: 'Belanja Pegawai', pagu: 5000000000 },
-        { id: 'a2', skpdId: '1', kodeAkun: '5.1.02', namaAkun: 'Belanja Barang & Jasa', pagu: 2000000000 },
-        { id: 'a3', skpdId: '2', kodeAkun: '5.1.01', namaAkun: 'Belanja Pegawai', pagu: 4000000000 },
-        { id: 'a4', skpdId: '2', kodeAkun: '5.2.01', namaAkun: 'Belanja Modal', pagu: 8000000000 }
-      ];
-      setAnggarans(sampleAnggaran);
-    }
-
-    if (savedRealisasis) {
-      setRealisasis(JSON.parse(savedRealisasis));
-    } else {
-      // Sample Realisasi
-      const sampleRealisasi = [
-        { id: 'r1', anggaranId: 'a1', tanggal: '2024-01-15', nilai: 450000000, keterangan: 'Gaji Januari' },
-        { id: 'r2', anggaranId: 'a3', tanggal: '2024-01-15', nilai: 380000000, keterangan: 'Gaji Januari' },
-        { id: 'r3', anggaranId: 'a2', tanggal: '2024-02-10', nilai: 120000000, keterangan: 'ATK Kantor' }
-      ];
-      setRealisasis(sampleRealisasi);
-    }
-  }, []);
-
-  // Sync with storage
-  useEffect(() => {
-    try {
-      localStorage.setItem('skpds', JSON.stringify(skpds));
-      localStorage.setItem('anggarans', JSON.stringify(anggarans));
-      localStorage.setItem('realisasis', JSON.stringify(realisasis));
-    } catch (e) {
-      console.warn('Storage limit reached, changes will not persist after refresh:', e);
-    }
-  }, [skpds, anggarans, realisasis]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -94,6 +47,46 @@ export default function App() {
     { id: 'transactions', label: 'Realisasi', icon: ArrowRightLeft },
     { id: 'reports', label: 'Laporan', icon: FileText },
   ];
+
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-50 flex-col gap-4">
+        <div className="w-12 h-12 border-4 border-bento-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-bento-accent animate-pulse uppercase tracking-widest">Memuat Sistem...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen w-screen bg-bento-accent flex items-center justify-center p-6 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent)]">
+        <div className="max-w-md w-full bg-white rounded-[40px] p-12 shadow-2xl space-y-8 relative overflow-hidden border border-white/20">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-bento-primary/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+          <div className="relative text-center space-y-4">
+            <div className="w-20 h-20 bg-bento-primary rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
+               <Database className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-black text-bento-accent tracking-tighter uppercase">SI-REALISASI</h1>
+            <p className="text-sm text-bento-text-sub font-medium leading-relaxed">
+              Sistem Informasi Monitoring Anggaran & Realisasi Terintegrasi. Silakan masuk untuk melanjutkan.
+            </p>
+          </div>
+
+          <button 
+            onClick={login}
+            className="w-full bg-bento-accent text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+          >
+            <LogIn className="w-5 h-5" />
+            <span>Masuk dengan Google</span>
+          </button>
+
+          <p className="text-[10px] text-center text-bento-text-sub uppercase font-bold tracking-widest pt-4">
+            Pemerintah Provinsi Maju Jaya • 2026
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#f4f6f9] text-[#1e293b] overflow-hidden font-sans">
@@ -144,6 +137,15 @@ export default function App() {
         </nav>
 
         <div className="p-6 border-t border-white/10 space-y-4">
+          <div className="bento-group-label">{sidebarOpen ? 'Pengaturan' : '•••'}</div>
+          <button 
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-100 hover:text-white hover:bg-red-500/20 rounded-xl transition-all text-sm font-bold"
+          >
+            <LogOut className="w-5 h-5 text-red-400" />
+            {sidebarOpen && <span>Keluar Sistem</span>}
+          </button>
+
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="w-full flex items-center gap-3 px-4 py-2 text-white/50 hover:text-white transition-all text-sm"
@@ -170,11 +172,15 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right mr-2 hidden sm:block">
-              <p className="text-sm font-bold text-bento-accent">Budi Santoso</p>
-              <p className="text-[11px] text-bento-text-sub font-medium uppercase tracking-wider">BPKAD Prov. Maju Jaya</p>
+              <p className="text-sm font-bold text-bento-accent">{user?.displayName || 'User'}</p>
+              <p className="text-[11px] text-bento-text-sub font-medium uppercase tracking-wider">{user?.email}</p>
             </div>
             <div className="w-11 h-11 bg-bento-border rounded-full flex items-center justify-center text-gray-500 overflow-hidden shadow-sm">
-              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300"></div>
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt={user.displayName || ''} referrerPolicy="no-referrer" />
+              ) : (
+                <UserIcon className="w-6 h-6 text-slate-400" />
+              )}
             </div>
           </div>
         </header>
@@ -190,34 +196,16 @@ export default function App() {
               className="max-w-7xl mx-auto h-full"
             >
               {activePage === 'dashboard' && (
-                <Dashboard 
-                  skpds={skpds} 
-                  anggarans={anggarans} 
-                  realisasis={realisasis} 
-                />
+                <Dashboard />
               )}
               {activePage === 'master' && (
-                <MasterData 
-                  skpds={skpds} 
-                  setSkpds={setSkpds}
-                  anggarans={anggarans}
-                  setAnggarans={setAnggarans}
-                />
+                <MasterData />
               )}
               {activePage === 'transactions' && (
-                <Transactions 
-                  anggarans={anggarans}
-                  skpds={skpds}
-                  realisasis={realisasis}
-                  setRealisasis={setRealisasis}
-                />
+                <Transactions />
               )}
               {activePage === 'reports' && (
-                <Reports 
-                  skpds={skpds}
-                  anggarans={anggarans}
-                  realisasis={realisasis}
-                />
+                <Reports />
               )}
             </motion.div>
           </AnimatePresence>

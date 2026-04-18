@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "SKPD": {
+      "title": "SKPD",
+      "description": "Satuan Kerja Perangkat Daerah",
+      "type": "object",
+      "properties": {
+        "kode": { "type": "string" },
+        "nama": { "type": "string" }
+      },
+      "required": ["kode", "nama"]
+    },
+    "Anggaran": {
+      "title": "Anggaran",
+      "description": "Data Anggaran per Mata Rekening",
+      "type": "object",
+      "properties": {
+        "skpdId": { "type": "string" },
+        "kodeProgram": { "type": "string" },
+        "namaProgram": { "type": "string" },
+        "kodeKegiatan": { "type": "string" },
+        "namaKegiatan": { "type": "string" },
+        "kodeSubKegiatan": { "type": "string" },
+        "namaSubKegiatan": { "type": "string" },
+        "kodeAkun": { "type": "string" },
+        "namaAkun": { "type": "string" },
+        "pagu": { "type": "number" }
+      },
+      "required": ["skpdId", "kodeAkun", "pagu"]
+    },
+    "Realisasi": {
+      "title": "Realisasi",
+      "description": "Data Realisasi Transaksi Keuangan",
+      "type": "object",
+      "properties": {
+        "anggaranId": { "type": "string" },
+        "tanggal": { "type": "string", "format": "date" },
+        "nilai": { "type": "number" },
+        "keterangan": { "type": "string" }
+      },
+      "required": ["anggaranId", "tanggal", "nilai"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile and authorization data",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "isAdmin": { "type": "boolean" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/skpds/{skpdId}": {
+      "schema": "SKPD",
+      "description": "List of Units (SKPD)"
+    },
+    "/anggarans/{anggaranId}": {
+      "schema": "Anggaran",
+      "description": "Budget definitions mapped to accounts and units"
+    },
+    "/realisasis/{realisasiId}": {
+      "schema": "Realisasi",
+      "description": "Transaction logs for money spent against budget"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Authenticated user profiles"
+    }
+  }
+}

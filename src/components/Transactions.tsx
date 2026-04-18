@@ -13,15 +13,14 @@ import * as XLSX from 'xlsx';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, cn, generateId } from '../lib/utils';
 import { format, isValid, parse } from 'date-fns';
+import { useFirebase } from '../contexts/FirebaseContext';
 
-interface Props {
-  anggarans: Anggaran[];
-  skpds: SKPD[];
-  realisasis: Realisasi[];
-  setRealisasis: React.Dispatch<React.SetStateAction<Realisasi[]>>;
-}
+export default function Transactions() {
+  const { 
+    anggarans, skpds, realisasis, 
+    saveRealisasi, saveRealisasisBulk, deleteRealisasi 
+  } = useFirebase();
 
-export default function Transactions({ anggarans, skpds, realisasis, setRealisasis }: Props) {
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   
@@ -41,7 +40,7 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
       ...formData
     };
 
-    setRealisasis(prev => [newRealisasi, ...prev]);
+    saveRealisasi(newRealisasi);
     setShowAdd(false);
     setFormData({
       anggaranId: '',
@@ -156,7 +155,7 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
             .filter((r): r is Realisasi => r !== null);
 
           if (importedData.length > 0) {
-            setRealisasis(prev => [...importedData, ...prev]);
+            saveRealisasisBulk(importedData);
             alert(`Berhasil mengimpor ${importedData.length} data Realisasi.`);
           } else {
             const keys = Object.keys(results[0]).join(', ');
@@ -332,7 +331,7 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
                     </td>
                     <td className="px-8 py-5 text-right">
                       <button 
-                         onClick={() => setRealisasis(prev => prev.filter(r => r.id !== item.id))}
+                         onClick={() => deleteRealisasi(item.id)}
                         className="text-bento-text-sub hover:text-bento-danger transition-colors p-2 rounded-lg hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4" />
