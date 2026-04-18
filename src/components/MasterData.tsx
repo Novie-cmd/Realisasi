@@ -7,11 +7,13 @@ import {
   Search, 
   Building2, 
   ListOrdered,
-  Database
+  Database,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SKPD, Anggaran } from '../lib/types';
-import { cn, formatIDR } from '../lib/utils';
+import { cn, formatIDR, generateId } from '../lib/utils';
 
 interface Props {
   skpds: SKPD[];
@@ -20,20 +22,12 @@ interface Props {
   setAnggarans: React.Dispatch<React.SetStateAction<Anggaran[]>>;
 }
 
-const generateId = () => {
-  try {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-  } catch (e) {
-    // Fallback if crypto is not available in non-secure context
-  }
-  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-};
+const ITEMS_PER_PAGE = 50;
 
 export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }: Props) {
   const [tab, setTab] = useState<'skpd' | 'anggaran'>('skpd');
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleImportSKPD = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -191,12 +185,12 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
     }
   };
 
-  const filteredSkpds = skpds.filter(s => 
+  const filteredSkpds = React.useMemo(() => skpds.filter(s => 
     s.nama.toLowerCase().includes(search.toLowerCase()) || 
     s.kode.toLowerCase().includes(search.toLowerCase())
-  );
+  ), [skpds, search]);
 
-  const filteredAnggarans = anggarans.filter(a => {
+  const filteredAnggarans = React.useMemo(() => anggarans.filter(a => {
     const skpd = skpds.find(s => s.id === a.skpdId);
     const searchLower = search.toLowerCase();
     return a.namaAkun.toLowerCase().includes(searchLower) || 
@@ -205,7 +199,19 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
            (a.namaKegiatan || '').toLowerCase().includes(searchLower) ||
            (a.namaSubKegiatan || '').toLowerCase().includes(searchLower) ||
            skpd?.nama.toLowerCase().includes(searchLower);
-  });
+  }), [anggarans, skpds, search]);
+
+  // Reset page when search or tab changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, tab]);
+
+  const totalItems = tab === 'skpd' ? filteredSkpds.length : filteredAnggarans.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const currentData = React.useMemo(() => {
+    const list = tab === 'skpd' ? filteredSkpds : filteredAnggarans;
+    return list.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [tab, filteredSkpds, filteredAnggarans, currentPage]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -301,9 +307,9 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
             </thead>
             <tbody className="divide-y divide-bento-border">
               {tab === 'skpd' ? (
-                filteredSkpds.map((skpd) => (
+                currentData.map((skpd) => (
                   <tr key={skpd.id} className="hover:bg-slate-50/50 transition-all duration-200">
-                    <td className="px-8 py-5 text-sm font-mono text-bento-primary font-bold">{skpd.kode}</td>
+                    <td className="px-8 py-5 text-sm font-mono text-bento-primary font-bold">{skpd.id.startsWith('temp-') ? '(Baru)' : skpd.kode}</td>
                     <td className="px-8 py-5 text-sm font-bold text-bento-accent">{skpd.nama}</td>
                     <td className="px-8 py-5 text-sm text-right">
                       <button 
@@ -316,7 +322,7 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
                   </tr>
                 ))
               ) : (
-                filteredAnggarans.map((anggaran) => {
+                (currentData as Anggaran[]).map((anggaran) => {
                   const skpd = skpds.find(s => s.id === anggaran.skpdId);
                   return (
                     <tr key={anggaran.id} className="hover:bg-slate-50/50 transition-all duration-200">
@@ -380,6 +386,34 @@ export default function MasterData({ skpds, setSkpds, anggarans, setAnggarans }:
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-8 py-4 bg-slate-50 border-t border-bento-border flex items-center justify-between">
+            <div className="text-xs font-bold text-bento-text-sub uppercase tracking-widest">
+              Menampilkan {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} dari {totalItems} data
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                className="p-2 bg-white border border-bento-border rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4 text-bento-accent" />
+              </button>
+              <span className="text-xs font-bold text-bento-accent px-4 py-2 bg-white border border-bento-border rounded-lg shadow-sm">
+                Hal {currentPage} / {totalPages}
+              </span>
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                className="p-2 bg-white border border-bento-border rounded-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition-all"
+              >
+                <ChevronRight className="w-4 h-4 text-bento-accent" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CSV Template Helpers */}

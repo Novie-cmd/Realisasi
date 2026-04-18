@@ -6,11 +6,13 @@ import {
   ArrowRightLeft, 
   Trash2,
   Filter,
-  X
+  X,
+  Upload
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
-import { formatIDR, cn } from '../lib/utils';
-import { format, isValid } from 'date-fns';
+import { formatIDR, cn, generateId } from '../lib/utils';
+import { format, isValid, parse } from 'date-fns';
 
 interface Props {
   anggarans: Anggaran[];
@@ -35,7 +37,7 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
     if (!formData.anggaranId || formData.nilai <= 0) return;
 
     const newRealisasi: Realisasi = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       ...formData
     };
 
@@ -54,6 +56,107 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
     return r.keterangan.toLowerCase().includes(search.toLowerCase()) || 
            anggaran?.namaAkun.toLowerCase().includes(search.toLowerCase());
   });
+
+  const handleImportRealisasi = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = event.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const results = XLSX.utils.sheet_to_json(sheet) as any[];
+          
+          if (results.length === 0) {
+            alert("File Excel kosong atau tidak terbaca.");
+            return;
+          }
+
+          const importedData: Realisasi[] = results
+            .map((row: any) => {
+              const normalizedRow: any = {};
+              Object.keys(row).forEach(key => {
+                const k = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                
+                if (k.includes('kodeskpd')) normalizedRow.skpd_kode = row[key];
+                if (k.includes('koderekening') || k.includes('kodeakun')) normalizedRow.kode_akun = row[key];
+                if (k === 'jumlah' || k === 'nilai' || k === 'pagu' || k.includes('jumlah') || k.includes('pagu')) normalizedRow.nilai = row[key];
+                if (k === 'tanggal' || k.includes('tgl')) normalizedRow.tanggal = row[key];
+                if (k === 'keterangan' || k.includes('uraian') || k.includes('ket')) normalizedRow.keterangan = row[key];
+              });
+              return normalizedRow;
+            })
+            .filter((row: any) => row.skpd_kode != null && row.kode_akun != null && row.nilai != null)
+            .map((row: any) => {
+              const skpd = skpds.find(s => s.kode === String(row.skpd_kode).trim());
+              const anggaran = anggarans.find(a => 
+                a.skpdId === skpd?.id && 
+                a.kodeAkun === String(row.kode_akun).trim()
+              );
+
+              if (!anggaran) return null;
+
+              // Clean numeric values
+              let amount = 0;
+              if (typeof row.nilai === 'number') {
+                amount = row.nilai;
+              } else {
+                let cleanVal = String(row.nilai).replace(/[Rp\s]/gi, '');
+                if (cleanVal.includes('.') && cleanVal.includes(',')) {
+                  cleanVal = cleanVal.replace(/\./g, '').replace(',', '.');
+                } else if (cleanVal.includes('.') && !cleanVal.includes(',')) {
+                   if ((cleanVal.match(/\./g) || []).length > 1 || cleanVal.split('.')[1].length === 3) {
+                     cleanVal = cleanVal.replace(/\./g, '');
+                   }
+                } else if (cleanVal.includes(',') && !cleanVal.includes('.')) {
+                  cleanVal = cleanVal.replace(',', '.');
+                }
+                amount = Number(cleanVal.replace(/[^0-9.-]+/g, ""));
+              }
+              if (isNaN(amount)) amount = 0;
+
+              // Handle Date
+              let dateStr = format(new Date(), 'yyyy-MM-dd');
+              if (row.tanggal) {
+                // Try parsing Excel date number
+                if (typeof row.tanggal === 'number') {
+                  const date = XLSX.SSF.parse_date_code(row.tanggal);
+                  dateStr = format(new Date(date.y, date.m - 1, date.d), 'yyyy-MM-dd');
+                } else {
+                  const d = new Date(row.tanggal);
+                  if (isValid(d)) {
+                    dateStr = format(d, 'yyyy-MM-dd');
+                  }
+                }
+              }
+
+              return {
+                id: generateId(),
+                anggaranId: anggaran.id,
+                tanggal: dateStr,
+                nilai: amount,
+                keterangan: String(row.keterangan || 'Imported Transaction').trim(),
+              };
+            })
+            .filter((r): r is Realisasi => r !== null);
+
+          if (importedData.length > 0) {
+            setRealisasis(prev => [...importedData, ...prev]);
+            alert(`Berhasil mengimpor ${importedData.length} data Realisasi.`);
+          } else {
+            const keys = Object.keys(results[0]).join(', ');
+            alert(`Gagal Impor Realisasi.\n\nKolom ditemukan: [${keys}]\n\nPastikan ada kolom:\n- Kode SKPD\n- Kode Rekening\n- Jumlah/Nilai\n\nSerta pastikan Kode SKPD dan Kode Rekening sudah ada di Data Master.`);
+          }
+        } catch (error) {
+          console.error("Import error:", error);
+          alert("Gagal membaca file Excel.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -74,6 +177,16 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
               className="pl-10 pr-4 py-2.5 bg-white border border-bento-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-bento-primary/20 focus:border-bento-primary w-full sm:w-64 transition-all"
             />
           </div>
+          <label className="flex items-center gap-2 px-5 py-2.5 bg-bento-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 cursor-pointer transition-all shadow-sm">
+            <Upload className="w-4 h-4" />
+            <span>Import</span>
+            <input 
+              type="file" 
+              accept=".xlsx,.xls" 
+              className="hidden" 
+              onChange={handleImportRealisasi}
+            />
+          </label>
           <button 
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-bento-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
@@ -228,6 +341,24 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Excel Template Helpers */}
+      <div className="p-6 bg-white rounded-2xl border border-bento-border flex items-start gap-4 shadow-sm">
+        <div className="p-3 bg-bento-primary/10 rounded-xl">
+          <Upload className="w-5 h-5 text-bento-primary" />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold text-bento-accent mb-1">Panduan Struktur File Excel Realisasi</h4>
+          <p className="text-xs text-bento-text-sub leading-relaxed">
+            Gunakan struktur kolom yang sama dengan Import Anggaran untuk mengenali Mata Anggaran. 
+            Sistem akan mencocokkan transaksi berdasarkan <b>Kode SKPD</b> dan <b>Kode Rekening</b>. 
+            Anda dapat menambahkan kolom <b>Tanggal</b> dan <b>Keterangan</b>.
+          </p>
+          <div className="mt-3 inline-block px-3 py-1.5 bg-slate-50 border border-bento-border rounded-lg font-mono text-[10px] text-bento-primary font-bold overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
+            Kode SKPD, Kode Rekening, Jumlah, Tanggal, Keterangan
+          </div>
         </div>
       </div>
     </div>
