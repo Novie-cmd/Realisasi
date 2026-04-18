@@ -37,6 +37,7 @@ interface FirebaseContextType {
   saveRealisasi: (data: Realisasi) => Promise<void>;
   saveRealisasisBulk: (data: Realisasi[]) => Promise<void>;
   deleteRealisasi: (id: string) => Promise<void>;
+  deleteAllRealisasi: () => Promise<void>;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -264,13 +265,32 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { handleFirestoreError(err, 'delete', `realisasis/${id}`); }
   };
 
+  const deleteAllRealisasi = async () => {
+    const chunks = [];
+    for (let i = 0; i < realisasis.length; i += 500) {
+      chunks.push(realisasis.slice(i, i + 500));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(item => {
+        batch.delete(doc(db, 'realisasis', item.id));
+      });
+      try {
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, 'delete', 'realisasis/bulk');
+      }
+    }
+  };
+
   return (
     <FirebaseContext.Provider value={{ 
       user, loading, syncError, dataLoading, skpds, anggarans, realisasis, 
       login, logout, 
       saveSKPD, saveSKPDsBulk, deleteSKPD,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran,
-      saveRealisasi, saveRealisasisBulk, deleteRealisasi
+      saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi
     }}>
       {children}
     </FirebaseContext.Provider>
