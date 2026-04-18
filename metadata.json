@@ -1,0 +1,6 @@
+{
+  "name": "SIRENG - Sistem Informasi Realisasi Anggaran",
+  "description": "Aplikasi untuk monitoring realisasi anggaran SKPD, master data, dan pelaporan keuangan daerah.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
