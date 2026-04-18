@@ -85,16 +85,29 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
                 if (k === 'jumlah' || k === 'nilai' || k === 'pagu' || k.includes('jumlah') || k.includes('pagu')) normalizedRow.nilai = row[key];
                 if (k === 'tanggal' || k.includes('tgl')) normalizedRow.tanggal = row[key];
                 if (k === 'keterangan' || k.includes('uraian') || k.includes('ket')) normalizedRow.keterangan = row[key];
+                
+                // Track hierarchy headers to support finding matching budget
+                if (k.includes('kodeprogram')) normalizedRow.kode_program = row[key];
+                if (k.includes('kodekegiatan') && !k.includes('sub')) normalizedRow.kode_kegiatan = row[key];
+                if (k.includes('kodesub') || k.includes('kodesubkeg')) normalizedRow.kode_sub = row[key];
               });
               return normalizedRow;
             })
             .filter((row: any) => row.skpd_kode != null && row.kode_akun != null && row.nilai != null)
             .map((row: any) => {
               const skpd = skpds.find(s => s.kode === String(row.skpd_kode).trim());
-              const anggaran = anggarans.find(a => 
-                a.skpdId === skpd?.id && 
-                a.kodeAkun === String(row.kode_akun).trim()
-              );
+              
+              // Find budget with more precision if hierarchy info is available
+              const anggaran = anggarans.find(a => {
+                const matchBase = a.skpdId === skpd?.id && a.kodeAkun === String(row.kode_akun).trim();
+                
+                // If the file has sub-activities/programs, use them to narrow down (useful if accounts repeat across programs)
+                if (row.kode_sub) return matchBase && a.kodeSubKegiatan === String(row.kode_sub).trim();
+                if (row.kode_kegiatan) return matchBase && a.kodeKegiatan === String(row.kode_kegiatan).trim();
+                if (row.kode_program) return matchBase && a.kodeProgram === String(row.kode_program).trim();
+                
+                return matchBase;
+              });
 
               if (!anggaran) return null;
 
@@ -147,7 +160,7 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
             alert(`Berhasil mengimpor ${importedData.length} data Realisasi.`);
           } else {
             const keys = Object.keys(results[0]).join(', ');
-            alert(`Gagal Impor Realisasi.\n\nKolom ditemukan: [${keys}]\n\nPastikan ada kolom:\n- Kode SKPD\n- Kode Rekening\n- Jumlah/Nilai\n\nSerta pastikan Kode SKPD dan Kode Rekening sudah ada di Data Master.`);
+            alert(`Gagal Impor Realisasi.\n\nKolom ditemukan: [${keys}]\n\nPastikan ada kolom:\n- Kode SKPD\n- Kode Rekening\n- Jumlah\n\nSerta pastikan data tersebut sudah ada di Data Master (Anggaran).`);
           }
         } catch (error) {
           console.error("Import error:", error);
@@ -352,12 +365,11 @@ export default function Transactions({ anggarans, skpds, realisasis, setRealisas
         <div>
           <h4 className="text-sm font-bold text-bento-accent mb-1">Panduan Struktur File Excel Realisasi</h4>
           <p className="text-xs text-bento-text-sub leading-relaxed">
-            Gunakan struktur kolom yang sama dengan Import Anggaran untuk mengenali Mata Anggaran. 
-            Sistem akan mencocokkan transaksi berdasarkan <b>Kode SKPD</b> dan <b>Kode Rekening</b>. 
-            Anda dapat menambahkan kolom <b>Tanggal</b> dan <b>Keterangan</b>.
+            Gunakan struktur kolom yang sama dengan Import Anggaran untuk mengenali Mata Anggaran secara otomatis.
+            Sistem akan mencocokkan transaksi berdasarkan hierarki kode yang tersedia.
           </p>
           <div className="mt-3 inline-block px-3 py-1.5 bg-slate-50 border border-bento-border rounded-lg font-mono text-[10px] text-bento-primary font-bold overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
-            Kode SKPD, Kode Rekening, Jumlah, Tanggal, Keterangan
+            Kode SKPD, SKPD, Kode Program, Program, Kode Kegiatan, Kegiatan, Kode Sub Kegaitan, Sub Kegiatan, Kode Rekening, Rekening, Jumlah, Tanggal, Keterangan
           </div>
         </div>
       </div>
