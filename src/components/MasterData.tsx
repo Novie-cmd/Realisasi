@@ -41,11 +41,16 @@ export default function MasterData() {
           const sheet = workbook.Sheets[sheetName];
           const results = XLSX.utils.sheet_to_json(sheet) as any[];
           
+          if (results.length === 0) {
+            alert("File Excel kosong atau tidak terbaca.");
+            return;
+          }
+
           const newData: SKPD[] = results
             .map((row: any) => {
               const normalizedRow: any = {};
               Object.keys(row).forEach(key => {
-                const k = key.toLowerCase().trim();
+                const k = key.toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (k.includes('kode')) normalizedRow.kode = row[key];
                 if (k.includes('nama') || k.includes('skpd')) normalizedRow.nama = row[key];
               });
@@ -62,12 +67,12 @@ export default function MasterData() {
             saveSKPDsBulk(newData);
             alert(`Berhasil mengimpor ${newData.length} data SKPD.`);
           } else {
-            const firstRow = results[0] ? Object.keys(results[0]).join(', ') : 'File kosong';
-            alert(`Tidak ada data valid ditemukan.\n\nHeader yang terbaca: ${firstRow}\n\nPastikan ada kolom: 'kode' dan 'nama'.`);
+            const detectedKeys = results[0] ? Object.keys(results[0]).join(', ') : 'File kosong';
+            alert(`Gagal Impor SKPD.\n\nKolom yang ditemukan di Excel: [${detectedKeys}]\n\nPastikan ada kolom dengan nama:\n- "Kode"\n- "Nama" atau "SKPD"`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Import error:", error);
-          alert("Gagal membaca file Excel.");
+          alert(`Gagal membaca file Excel: ${error.message || 'Error tidak diketahui'}`);
         }
       };
       reader.readAsArrayBuffer(file);
