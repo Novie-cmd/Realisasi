@@ -18,10 +18,28 @@ type ReportType = 'skpd' | 'program' | 'kegiatan' | 'sub' | 'akun';
 export default function Reports() {
   const { skpds, anggarans, realisasis } = useFirebase();
   const [type, setType] = useState<ReportType>('skpd');
+  const [selectedSkpdId, setSelectedSkpdId] = useState<string>('');
+
+  const filteredAnggarans = useMemo(() => {
+    if (!selectedSkpdId) return anggarans;
+    return anggarans.filter(a => a.skpdId === selectedSkpdId);
+  }, [anggarans, selectedSkpdId]);
+
+  const filteredRealisasis = useMemo(() => {
+    if (!selectedSkpdId) return realisasis;
+    return realisasis.filter(r => {
+      const a = anggarans.find(ang => ang.id === r.anggaranId);
+      return a?.skpdId === selectedSkpdId;
+    });
+  }, [realisasis, anggarans, selectedSkpdId]);
 
   const reportData = useMemo(() => {
     if (type === 'skpd') {
-      return skpds.map(skpd => {
+      const targetSkpds = selectedSkpdId 
+        ? skpds.filter(s => s.id === selectedSkpdId)
+        : skpds;
+
+      return targetSkpds.map(skpd => {
         const pagu = anggarans
           .filter(a => a.skpdId === skpd.id)
           .reduce((sum, item) => sum + item.pagu, 0);
@@ -45,7 +63,7 @@ export default function Reports() {
       // Group by various hierarchical levels
       const groups: Record<string, { pagu: number, realisasi: number, kode: string }> = {};
       
-      anggarans.forEach(a => {
+      filteredAnggarans.forEach(a => {
         let label = '';
         let kode = '';
         
@@ -67,7 +85,7 @@ export default function Reports() {
         groups[label].pagu += a.pagu;
       });
 
-      realisasis.forEach(r => {
+      filteredRealisasis.forEach(r => {
         const a = anggarans.find(ang => ang.id === r.anggaranId);
         if (a) {
           let label = '';
@@ -92,7 +110,7 @@ export default function Reports() {
         persen: data.pagu > 0 ? data.realisasi / data.pagu : 0
       })).sort((a, b) => b.pagu - a.pagu);
     }
-  }, [type, skpds, anggarans, realisasis]);
+  }, [type, skpds, anggarans, realisasis, filteredAnggarans, filteredRealisasis, selectedSkpdId]);
 
   const totals = useMemo(() => {
     return reportData.reduce((acc, curr) => ({
@@ -105,52 +123,69 @@ export default function Reports() {
   return (
     <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex flex-wrap bg-bento-border/30 p-1 rounded-xl border border-bento-border w-fit gap-1">
-          <button 
-            onClick={() => setType('skpd')}
-            className={cn(
-               "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-              type === 'skpd' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
-            )}
-          >
-            SKPD
-          </button>
-          <button 
-            onClick={() => setType('program')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-              type === 'program' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
-            )}
-          >
-            Program
-          </button>
-          <button 
-            onClick={() => setType('kegiatan')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-              type === 'kegiatan' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
-            )}
-          >
-            Kegiatan
-          </button>
-          <button 
-            onClick={() => setType('sub')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-              type === 'sub' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
-            )}
-          >
-            Sub Kegiatan
-          </button>
-          <button 
-            onClick={() => setType('akun')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-              type === 'akun' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
-            )}
-          >
-            Rekening
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap bg-bento-border/30 p-1 rounded-xl border border-bento-border w-fit gap-1">
+            <button 
+              onClick={() => setType('skpd')}
+              className={cn(
+                 "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                type === 'skpd' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+              )}
+            >
+              SKPD
+            </button>
+            <button 
+              onClick={() => setType('program')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                type === 'program' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+              )}
+            >
+              Program
+            </button>
+            <button 
+              onClick={() => setType('kegiatan')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                type === 'kegiatan' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+              )}
+            >
+              Kegiatan
+            </button>
+            <button 
+              onClick={() => setType('sub')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                type === 'sub' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+              )}
+            >
+              Sub Kegiatan
+            </button>
+            <button 
+              onClick={() => setType('akun')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                type === 'akun' ? "bg-white text-bento-accent shadow-sm" : "text-bento-text-sub hover:text-bento-accent"
+              )}
+            >
+              Rekening
+            </button>
+          </div>
+
+          <div className="relative group no-print">
+            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-sub pointer-events-none" />
+            <select 
+              value={selectedSkpdId}
+              onChange={(e) => setSelectedSkpdId(e.target.value)}
+              className="pl-9 pr-10 py-2.5 bg-white border border-bento-border rounded-xl text-xs font-bold text-bento-accent focus:ring-2 focus:ring-bento-primary/20 appearance-none cursor-pointer shadow-sm hover:border-bento-primary/30 transition-all outline-none"
+            >
+              <option value="">Semua SKPD</option>
+              {skpds.sort((a,b) => a.nama.localeCompare(b.nama)).map(skpd => (
+                <option key={skpd.id} value={skpd.id}>{skpd.nama}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-bento-text-sub pointer-events-none group-hover:text-bento-accent transition-colors" />
+          </div>
         </div>
 
         <button 
@@ -175,7 +210,7 @@ export default function Reports() {
                 type === 'kegiatan' ? 'Kegiatan' : 
                 type === 'sub' ? 'Sub Kegiatan' : 
                 'Mata Anggaran (Rekening)'
-              } • 2026
+              } {selectedSkpdId ? `• ${skpds.find(s => s.id === selectedSkpdId)?.nama}` : ''} • 2026
             </p>
           </div>
           <div className="text-right">
