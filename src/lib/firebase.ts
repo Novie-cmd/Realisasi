@@ -47,6 +47,10 @@ export interface FirestoreErrorInfo {
 }
 
 export const handleFirestoreError = (error: any, operationType: FirestoreErrorInfo['operationType'], path: string | null = null) => {
+  if (error?.code === 'resource-exhausted' || (error instanceof Error && error.message.includes('Quota limit exceeded'))) {
+    throw new Error('QUOTA_EXCEEDED');
+  }
+
   if (error?.code === 'permission-denied' || (error instanceof Error && error.message.includes('Missing or insufficient permissions'))) {
     const errorInfo: FirestoreErrorInfo = {
       error: error.message || 'Permission denied',

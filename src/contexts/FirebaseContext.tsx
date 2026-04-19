@@ -26,6 +26,7 @@ interface FirebaseContextType {
   skpds: SKPD[];
   anggarans: Anggaran[];
   realisasis: Realisasi[];
+  quotaExceeded: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   saveSKPD: (data: SKPD) => Promise<void>;
@@ -52,6 +53,16 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [realisasis, setRealisasis] = useState<Realisasi[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState({ skpds: true, anggarans: true, realisasis: true });
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
+
+  const handleAsyncError = (err: any) => {
+    if (err instanceof Error && err.message === 'QUOTA_EXCEEDED') {
+      setQuotaExceeded(true);
+      setSyncError("Kuota gratis database harian telah habis. Data tidak bisa disimpan/dihapus sampai besok pagi.");
+    } else {
+      console.error("Async Operation Error:", err);
+    }
+  };
 
   useEffect(() => {
     testFirestoreConnection();
@@ -171,7 +182,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const saveSKPD = async (data: SKPD) => {
     try {
       await setDoc(doc(db, 'skpds', data.id), data);
-    } catch (err) { handleFirestoreError(err, 'create', `skpds/${data.id}`); }
+    } catch (err) { 
+      handleAsyncError(err);
+      handleFirestoreError(err, 'create', `skpds/${data.id}`); 
+    }
   };
 
   const saveSKPDsBulk = async (data: SKPD[]) => {
@@ -188,6 +202,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (err) {
+        handleAsyncError(err);
         handleFirestoreError(err, 'write', 'skpds/bulk');
       }
     }
@@ -196,7 +211,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const deleteSKPD = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'skpds', id));
-    } catch (err) { handleFirestoreError(err, 'delete', `skpds/${id}`); }
+    } catch (err) { 
+      handleAsyncError(err);
+      handleFirestoreError(err, 'delete', `skpds/${id}`); 
+    }
   };
 
   const deleteAllSKPDs = async () => {
@@ -213,6 +231,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (err) {
+        handleAsyncError(err);
         handleFirestoreError(err, 'delete', 'skpds/bulk');
       }
     }
@@ -221,7 +240,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const saveAnggaran = async (data: Anggaran) => {
     try {
       await setDoc(doc(db, 'anggarans', data.id), data);
-    } catch (err) { handleFirestoreError(err, 'create', `anggarans/${data.id}`); }
+    } catch (err) { 
+      handleAsyncError(err);
+      handleFirestoreError(err, 'create', `anggarans/${data.id}`); 
+    }
   };
 
   const saveAnggaransBulk = async (data: Anggaran[]) => {
@@ -239,6 +261,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (err) {
+        handleAsyncError(err);
         handleFirestoreError(err, 'write', 'anggarans/bulk');
       }
     }
@@ -247,7 +270,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const deleteAnggaran = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'anggarans', id));
-    } catch (err) { handleFirestoreError(err, 'delete', `anggarans/${id}`); }
+    } catch (err) { 
+      handleAsyncError(err);
+      handleFirestoreError(err, 'delete', `anggarans/${id}`); 
+    }
   };
 
   const deleteAllAnggarans = async () => {
@@ -264,6 +290,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (err) {
+        handleAsyncError(err);
         handleFirestoreError(err, 'delete', 'anggarans/bulk');
       }
     }
@@ -272,7 +299,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const saveRealisasi = async (data: Realisasi) => {
     try {
       await setDoc(doc(db, 'realisasis', data.id), data);
-    } catch (err) { handleFirestoreError(err, 'create', `realisasis/${data.id}`); }
+    } catch (err) { 
+      handleAsyncError(err);
+      handleFirestoreError(err, 'create', `realisasis/${data.id}`); 
+    }
   };
 
   const saveRealisasisBulk = async (data: Realisasi[]) => {
@@ -289,6 +319,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (err) {
+        handleAsyncError(err);
         handleFirestoreError(err, 'write', 'realisasis/bulk');
       }
     }
@@ -297,7 +328,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const deleteRealisasi = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'realisasis', id));
-    } catch (err) { handleFirestoreError(err, 'delete', `realisasis/${id}`); }
+    } catch (err) { 
+      handleAsyncError(err);
+      handleFirestoreError(err, 'delete', `realisasis/${id}`); 
+    }
   };
 
   const deleteAllRealisasi = async () => {
@@ -314,6 +348,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (err) {
+        handleAsyncError(err);
         handleFirestoreError(err, 'delete', 'realisasis/bulk');
       }
     }
@@ -321,7 +356,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <FirebaseContext.Provider value={{ 
-      user, loading, syncError, dataLoading, skpds, anggarans, realisasis, 
+      user, loading, syncError, dataLoading, skpds, anggarans, realisasis, quotaExceeded,
       login, logout, 
       saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,
