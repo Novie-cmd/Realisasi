@@ -6,7 +6,8 @@ import {
   ChevronDown, 
   ChevronUp,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  Search
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
@@ -19,19 +20,47 @@ export default function Reports() {
   const { skpds, anggarans, realisasis } = useFirebase();
   const [type, setType] = useState<ReportType>('skpd');
   const [selectedSkpdId, setSelectedSkpdId] = useState<string>('');
+  const [accountSearch, setAccountSearch] = useState<string>('');
+  const [skpdSearch, setSkpdSearch] = useState<string>('');
+  const [showSkpdList, setShowSkpdList] = useState(false);
+
+  const filteredSkpds = useMemo(() => {
+    return skpds
+      .filter(s => s.nama.toLowerCase().includes(skpdSearch.toLowerCase()))
+      .sort((a, b) => a.nama.localeCompare(b.nama));
+  }, [skpds, skpdSearch]);
 
   const filteredAnggarans = useMemo(() => {
-    if (!selectedSkpdId) return anggarans;
-    return anggarans.filter(a => a.skpdId === selectedSkpdId);
-  }, [anggarans, selectedSkpdId]);
+    let result = anggarans;
+    if (selectedSkpdId) result = result.filter(a => a.skpdId === selectedSkpdId);
+    if (accountSearch) {
+      result = result.filter(a => 
+        a.namaAkun.toLowerCase().includes(accountSearch.toLowerCase()) ||
+        a.kodeAkun.toLowerCase().includes(accountSearch.toLowerCase())
+      );
+    }
+    return result;
+  }, [anggarans, selectedSkpdId, accountSearch]);
 
   const filteredRealisasis = useMemo(() => {
-    if (!selectedSkpdId) return realisasis;
-    return realisasis.filter(r => {
-      const a = anggarans.find(ang => ang.id === r.anggaranId);
-      return a?.skpdId === selectedSkpdId;
-    });
-  }, [realisasis, anggarans, selectedSkpdId]);
+    let result = realisasis;
+    if (selectedSkpdId) {
+      result = result.filter(r => {
+        const a = anggarans.find(ang => ang.id === r.anggaranId);
+        return a?.skpdId === selectedSkpdId;
+      });
+    }
+    if (accountSearch) {
+      result = result.filter(r => {
+        const a = anggarans.find(ang => ang.id === r.anggaranId);
+        return a && (
+          a.namaAkun.toLowerCase().includes(accountSearch.toLowerCase()) ||
+          a.kodeAkun.toLowerCase().includes(accountSearch.toLowerCase())
+        );
+      });
+    }
+    return result;
+  }, [realisasis, anggarans, selectedSkpdId, accountSearch]);
 
   const reportData = useMemo(() => {
     if (type === 'skpd') {
@@ -57,6 +86,25 @@ export default function Reports() {
           realisasi,
           sisa: pagu - realisasi,
           persen: pagu > 0 ? realisasi / pagu : 0
+        };
+      }).sort((a, b) => b.pagu - a.pagu);
+    } else if (type === 'akun' && accountSearch) {
+      // Specialized detailed view for account search
+      return filteredAnggarans.map(a => {
+        const realisasi = realisasis
+          .filter(r => r.anggaranId === a.id)
+          .reduce((sum, item) => sum + item.nilai, 0);
+        
+        const skpd = skpds.find(s => s.id === a.skpdId);
+        
+        return {
+          id: a.id,
+          label: a.namaAkun,
+          sublabel: `${a.kodeAkun} • ${skpd?.nama || 'Unknown SKPD'} • ${a.namaProgram}`,
+          pagu: a.pagu,
+          realisasi,
+          sisa: a.pagu - realisasi,
+          persen: a.pagu > 0 ? realisasi / a.pagu : 0
         };
       }).sort((a, b) => b.pagu - a.pagu);
     } else {
@@ -110,7 +158,7 @@ export default function Reports() {
         persen: data.pagu > 0 ? data.realisasi / data.pagu : 0
       })).sort((a, b) => b.pagu - a.pagu);
     }
-  }, [type, skpds, anggarans, realisasis, filteredAnggarans, filteredRealisasis, selectedSkpdId]);
+  }, [type, skpds, anggarans, realisasis, filteredAnggarans, filteredRealisasis, selectedSkpdId, accountSearch]);
 
   const totals = useMemo(() => {
     return reportData.reduce((acc, curr) => ({
@@ -173,18 +221,73 @@ export default function Reports() {
           </div>
 
           <div className="relative group no-print">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-sub pointer-events-none" />
+            <input 
+              type="text" 
+              placeholder="Cari Rekening..." 
+              value={accountSearch}
+              onChange={(e) => setAccountSearch(e.target.value)}
+              className="pl-9 pr-4 py-2.5 bg-white border border-bento-border rounded-xl text-xs font-bold text-bento-accent focus:ring-2 focus:ring-bento-primary/20 appearance-none shadow-sm hover:border-bento-primary/30 transition-all outline-none w-48 sm:w-64"
+            />
+          </div>
+
+          <div className="relative group no-print">
             <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-sub pointer-events-none" />
-            <select 
-              value={selectedSkpdId}
-              onChange={(e) => setSelectedSkpdId(e.target.value)}
-              className="pl-9 pr-10 py-2.5 bg-white border border-bento-border rounded-xl text-xs font-bold text-bento-accent focus:ring-2 focus:ring-bento-primary/20 appearance-none cursor-pointer shadow-sm hover:border-bento-primary/30 transition-all outline-none"
-            >
-              <option value="">Semua SKPD</option>
-              {skpds.sort((a,b) => a.nama.localeCompare(b.nama)).map(skpd => (
-                <option key={skpd.id} value={skpd.id}>{skpd.nama}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-bento-text-sub pointer-events-none group-hover:text-bento-accent transition-colors" />
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Pilih SKPD (Ketik...)"
+                value={selectedSkpdId ? skpds.find(s => s.id === selectedSkpdId)?.nama : skpdSearch}
+                onChange={(e) => {
+                  setSkpdSearch(e.target.value);
+                  if (selectedSkpdId) {
+                    setSelectedSkpdId('');
+                  }
+                }}
+                onFocus={() => setShowSkpdList(true)}
+                className="pl-9 pr-10 py-2.5 bg-white border border-bento-border rounded-xl text-xs font-bold text-bento-accent focus:ring-2 focus:ring-bento-primary/20 shadow-sm hover:border-bento-primary/30 transition-all outline-none w-48 sm:w-64"
+              />
+              <button 
+                onClick={() => setShowSkpdList(!showSkpdList)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-bento-text-sub hover:text-bento-accent transition-colors"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+
+              {showSkpdList && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-bento-border rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div 
+                    onClick={() => {
+                      setSelectedSkpdId('');
+                      setSkpdSearch('');
+                      setShowSkpdList(false);
+                    }}
+                    className="px-4 py-2.5 text-xs font-bold text-bento-text-sub hover:bg-slate-50 cursor-pointer border-b border-slate-50"
+                  >
+                    Semua SKPD
+                  </div>
+                  {filteredSkpds.map(skpd => (
+                    <div 
+                      key={skpd.id}
+                      onClick={() => {
+                        setSelectedSkpdId(skpd.id);
+                        setSkpdSearch(skpd.nama);
+                        setShowSkpdList(false);
+                      }}
+                      className="px-4 py-2.5 text-xs font-bold text-bento-accent hover:bg-slate-50 cursor-pointer border-b border-slate-50 flex flex-col"
+                    >
+                      <span>{skpd.nama}</span>
+                      <span className="text-[10px] text-bento-text-sub">{skpd.kode}</span>
+                    </div>
+                  ))}
+                  {filteredSkpds.length === 0 && (
+                    <div className="px-4 py-8 text-center text-xs text-bento-text-sub font-bold">
+                      SKPD tidak ditemukan
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
