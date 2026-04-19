@@ -81,7 +81,7 @@ export default function App() {
           </button>
 
           <p className="text-[10px] text-center text-bento-text-sub uppercase font-bold tracking-widest pt-4">
-            Pemerintah Provinsi Maju Jaya • 2026
+            Pemerintah Provinsi NTB • 2026
           </p>
         </div>
       </div>

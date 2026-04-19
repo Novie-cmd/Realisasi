@@ -94,7 +94,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
       setSkpds(prev => {
-        const map = new Map(prev.map(i => [i.id, i]));
+        const map = new Map<string, SKPD>(prev.map(i => [i.id, i]));
         let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as SKPD;
@@ -116,7 +116,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
       setAnggarans(prev => {
-        const map = new Map(prev.map(i => [i.id, i]));
+        const map = new Map<string, Anggaran>(prev.map(i => [i.id, i]));
         let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as Anggaran;
@@ -138,7 +138,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
       setRealisasis(prev => {
-        const map = new Map(prev.map(i => [i.id, i]));
+        const map = new Map<string, Realisasi>(prev.map(i => [i.id, i]));
         let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as Realisasi;

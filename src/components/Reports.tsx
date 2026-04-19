@@ -403,10 +403,9 @@ export default function Reports() {
         <div className="p-10 flex justify-between items-start text-xs text-bento-text-sub border-t border-bento-border bg-slate-50/20">
           <p className="font-medium">Sistem Terverifikasi • {format(new Date(), 'dd MMM yyyy HH:mm')}</p>
           <div className="text-center w-64">
-            <p className="mb-20 font-bold uppercase tracking-widest">Sekretaris Daerah,</p>
+            <p className="mb-20 font-bold uppercase tracking-widest">Sekretaris Daerah Provinsi NTB,</p>
             <div className="h-px bg-bento-accent w-full mb-2"></div>
-            <p className="font-extrabold text-bento-accent text-sm">Dr. Ir. H. Akhmad Basuki, M.Si</p>
-            <p className="font-bold">NIP. 19700101 199501 1 001</p>
+            <p className="font-extrabold text-bento-accent text-sm">Abul Chair, Ak</p>
           </div>
         </div>
       </div>
