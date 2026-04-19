@@ -83,21 +83,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
       setSkpds(prev => {
-        const next = [...prev];
+        const map = new Map(prev.map(i => [i.id, i]));
+        let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as SKPD;
-          if (change.type === 'added') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index === -1) next.push(data);
-          } else if (change.type === 'modified') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index > -1) next[index] = data;
-          } else if (change.type === 'removed') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index > -1) next.splice(index, 1);
+          if (change.type === 'removed') {
+            if (map.delete(data.id)) changed = true;
+          } else {
+            map.set(data.id, data);
+            changed = true;
           }
         });
-        return next;
+        return changed ? Array.from(map.values()) : prev;
       });
       setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
@@ -108,21 +105,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
       setAnggarans(prev => {
-        const next = [...prev];
+        const map = new Map(prev.map(i => [i.id, i]));
+        let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as Anggaran;
-          if (change.type === 'added') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index === -1) next.push(data);
-          } else if (change.type === 'modified') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index > -1) next[index] = data;
-          } else if (change.type === 'removed') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index > -1) next.splice(index, 1);
+          if (change.type === 'removed') {
+            if (map.delete(data.id)) changed = true;
+          } else {
+            map.set(data.id, data);
+            changed = true;
           }
         });
-        return next;
+        return changed ? Array.from(map.values()) : prev;
       });
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
@@ -133,21 +127,22 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
       setRealisasis(prev => {
-        const next = [...prev];
+        const map = new Map(prev.map(i => [i.id, i]));
+        let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as Realisasi;
-          if (change.type === 'added') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index === -1) next.push(data);
-          } else if (change.type === 'modified') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index > -1) next[index] = data;
-          } else if (change.type === 'removed') {
-            const index = next.findIndex(i => i.id === data.id);
-            if (index > -1) next.splice(index, 1);
+          if (change.type === 'removed') {
+            if (map.delete(data.id)) changed = true;
+          } else {
+            map.set(data.id, data);
+            changed = true;
           }
         });
-        return next;
+        // Realisasis should maintain sort order from query
+        if (changed) {
+          return Array.from(map.values()).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+        }
+        return prev;
       });
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
