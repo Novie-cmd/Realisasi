@@ -38,6 +38,8 @@ interface FirebaseContextType {
   saveRealisasisBulk: (data: Realisasi[]) => Promise<void>;
   deleteRealisasi: (id: string) => Promise<void>;
   deleteAllRealisasi: () => Promise<void>;
+  deleteAllSKPDs: () => Promise<void>;
+  deleteAllAnggarans: () => Promise<void>;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -202,6 +204,25 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { handleFirestoreError(err, 'delete', `skpds/${id}`); }
   };
 
+  const deleteAllSKPDs = async () => {
+    const chunks = [];
+    for (let i = 0; i < skpds.length; i += 500) {
+      chunks.push(skpds.slice(i, i + 500));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(item => {
+        batch.delete(doc(db, 'skpds', item.id));
+      });
+      try {
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, 'delete', 'skpds/bulk');
+      }
+    }
+  };
+
   const saveAnggaran = async (data: Anggaran) => {
     try {
       await setDoc(doc(db, 'anggarans', data.id), data);
@@ -232,6 +253,25 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     try {
       await deleteDoc(doc(db, 'anggarans', id));
     } catch (err) { handleFirestoreError(err, 'delete', `anggarans/${id}`); }
+  };
+
+  const deleteAllAnggarans = async () => {
+    const chunks = [];
+    for (let i = 0; i < anggarans.length; i += 500) {
+      chunks.push(anggarans.slice(i, i + 500));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(item => {
+        batch.delete(doc(db, 'anggarans', item.id));
+      });
+      try {
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, 'delete', 'anggarans/bulk');
+      }
+    }
   };
 
   const saveRealisasi = async (data: Realisasi) => {
@@ -288,8 +328,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     <FirebaseContext.Provider value={{ 
       user, loading, syncError, dataLoading, skpds, anggarans, realisasis, 
       login, logout, 
-      saveSKPD, saveSKPDsBulk, deleteSKPD,
-      saveAnggaran, saveAnggaransBulk, deleteAnggaran,
+      saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
+      saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,
       saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi
     }}>
       {children}

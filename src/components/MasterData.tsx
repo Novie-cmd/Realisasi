@@ -22,7 +22,8 @@ export default function MasterData() {
   const { 
     skpds, anggarans, dataLoading,
     saveSKPDsBulk, saveAnggaransBulk, 
-    deleteSKPD, deleteAnggaran 
+    deleteSKPD, deleteAnggaran,
+    deleteAllSKPDs, deleteAllAnggarans
   } = useFirebase();
 
   const [tab, setTab] = useState<'skpd' | 'anggaran'>('skpd');
@@ -254,7 +255,25 @@ export default function MasterData() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Bulk delete removed for safety in Firebase environment */}
+          <button 
+            onClick={async () => {
+              const msg = tab === 'skpd' 
+                ? 'Apakah Anda yakin ingin menghapus SEMUA data SKPD?' 
+                : 'Apakah Anda yakin ingin menghapus SEMUA data Anggaran?';
+              if (window.confirm(msg + ' Tindakan ini tidak dapat dibatalkan.')) {
+                setIsSaving(true);
+                if (tab === 'skpd') await deleteAllSKPDs();
+                else await deleteAllAnggarans();
+                setIsSaving(false);
+              }
+            }}
+            disabled={isSaving || (tab === 'skpd' ? skpds.length === 0 : anggarans.length === 0)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Hapus Semua</span>
+          </button>
+          
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-sub" />
             <input 
