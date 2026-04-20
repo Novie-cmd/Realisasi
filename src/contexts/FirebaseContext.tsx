@@ -15,7 +15,7 @@ import {
   orderBy,
   writeBatch
 } from 'firebase/firestore';
-import { auth, db, googleProvider, handleFirestoreError, testFirestoreConnection } from '../lib/firebase';
+import { auth, db, googleProvider, handleFirestoreError } from '../lib/firebase';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 
 interface FirebaseContextType {
@@ -56,16 +56,42 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   const handleAsyncError = (err: any) => {
-    if (err instanceof Error && err.message === 'QUOTA_EXCEEDED') {
-      setQuotaExceeded(true);
-      setSyncError("Kuota gratis database harian telah habis. Data tidak bisa disimpan/dihapus sampai besok pagi.");
-    } else {
-      console.error("Async Operation Error:", err);
+    try {
+      handleFirestoreError(err, 'list');
+    } catch (e: any) {
+      if (e.message === 'QUOTA_EXCEEDED') {
+        setQuotaExceeded(true);
+        setSyncError("Kuota gratis database harian telah habis. Data tidak bisa disimpan/dihapus sampai besok pagi.");
+        return;
+      }
+      
+      try {
+        const errorDetail = JSON.parse(e.message);
+        setSyncError(`Terjadi kesalahan sinkronisasi (${errorDetail.error}). Periksa hak akses akun ${user?.email}.`);
+      } catch {
+        console.error("Async Operation Error:", err);
+        setSyncError(`Gagal sinkronisasi data: ${err.message || 'Error tidak dikenal'}.`);
+      }
+    }
+  };
+
+  const verifyConnection = async () => {
+    try {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+      console.log("Firebase connection verified");
+    } catch (error: any) {
+      if (error?.code === 'resource-exhausted') {
+        handleAsyncError(error);
+      } else if (error instanceof Error && error.message.includes('the client is offline')) {
+        setSyncError("Perangkat Anda sedang offline. Hubungkan ke internet untuk melakukan sinkronisasi.");
+      } else {
+        console.error("Connection test failed:", error);
+      }
     }
   };
 
   useEffect(() => {
-    testFirestoreConnection();
+    verifyConnection();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
@@ -109,8 +135,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
-      console.error("SKPD Sync Error:", err);
-      setSyncError("Gagal sinkronisasi SKPD. Periksa koneksi atau hak akses.");
+      handleAsyncError(err);
+      if (syncError === null) {
+        setSyncError("Gagal sinkronisasi SKPD. Periksa koneksi atau hak akses.");
+      }
       setDataLoading(prev => ({ ...prev, skpds: false }));
     });
 
@@ -131,8 +159,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
-      console.error("Anggaran Sync Error:", err);
-      setSyncError("Gagal sinkronisasi Anggaran. Periksa koneksi atau hak akses.");
+      handleAsyncError(err);
+      if (syncError === null) {
+        setSyncError("Gagal sinkronisasi Anggaran. Periksa koneksi atau hak akses.");
+      }
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     });
 
@@ -157,8 +187,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
-      console.error("Realisasi Sync Error:", err);
-      setSyncError("Gagal sinkronisasi Realisasi. Periksa koneksi atau hak akses.");
+      handleAsyncError(err);
+      if (syncError === null) {
+        setSyncError("Gagal sinkronisasi Realisasi. Periksa koneksi atau hak akses.");
+      }
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     });
 
