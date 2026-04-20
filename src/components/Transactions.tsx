@@ -7,7 +7,8 @@ import {
   Trash2,
   Filter,
   X,
-  Upload
+  Upload,
+  TrendingUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
@@ -17,7 +18,7 @@ import { useFirebase } from '../contexts/FirebaseContext';
 
 export default function Transactions() {
   const { 
-    anggarans, skpds, realisasis, 
+    anggarans, skpds, realisasis, quotaExceeded,
     saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi 
   } = useFirebase();
 
@@ -201,7 +202,7 @@ export default function Transactions() {
           </div>
           <label className={cn(
             "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm",
-            isSaving ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
+            (isSaving || quotaExceeded) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
           )}>
             {isSaving ? (
               <>
@@ -216,7 +217,7 @@ export default function Transactions() {
                   type="file" 
                   accept=".xlsx,.xls" 
                   className="hidden" 
-                  disabled={isSaving}
+                  disabled={isSaving || quotaExceeded}
                   onChange={handleImportRealisasi}
                 />
               </>
@@ -230,7 +231,7 @@ export default function Transactions() {
                 setIsSaving(false);
               }
             }}
-            disabled={isSaving || realisasis.length === 0}
+            disabled={isSaving || quotaExceeded || realisasis.length === 0}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" />
@@ -238,7 +239,8 @@ export default function Transactions() {
           </button>
           <button 
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-bento-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+            disabled={quotaExceeded}
+            className="flex items-center gap-2 px-5 py-2.5 bg-bento-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-100 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" />
             <span>Tambah</span>
@@ -341,6 +343,17 @@ export default function Transactions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-bento-border">
+              {quotaExceeded && (
+                <tr>
+                   <td colSpan={5} className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-red-500">
+                      <TrendingUp className="w-10 h-10 rotate-180 opacity-50" />
+                      <p className="text-sm font-bold uppercase tracking-widest">Batas Kuota Tercapai</p>
+                      <p className="text-xs opacity-70">Sinkronisasi data tertunda. Anda melihat data dari cache lokal.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {filteredRealisasi.map((item) => {
                 const anggaran = anggarans.find(a => a.id === item.anggaranId);
                 const skpd = skpds.find(s => s.id === anggaran?.skpdId);

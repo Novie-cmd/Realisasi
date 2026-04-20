@@ -27,7 +27,7 @@ import { useFirebase } from '../contexts/FirebaseContext';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function Dashboard() {
-  const { skpds, anggarans, realisasis } = useFirebase();
+  const { skpds, anggarans, realisasis, quotaExceeded } = useFirebase();
   const stats = useMemo(() => {
     const totalAnggaran = anggarans.reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
     const totalRealisasi = realisasis.reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
@@ -76,7 +76,26 @@ export default function Dashboard() {
   }, [realisasis, anggarans]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pb-12">
+    <div className="space-y-6 pb-12">
+      {quotaExceeded && (
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="bg-red-50 border border-red-200 rounded-2xl p-6 flex items-center gap-4 overflow-hidden"
+        >
+          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-6 h-6 text-red-600" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-red-900 leading-none mb-1">Akses Database Terbatas (Limit Tercapai)</h4>
+            <p className="text-xs text-red-700 font-medium opacity-80">
+              Sistem telah mencapai batas pembacaan harian Google. Dashboard ini mungkin menampilkan data dari cache lokal Anda (tidak real-time).
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
       {/* Stats Cards - Bento Row 1 */}
       <StatCard 
         title="Total Pagu" 
@@ -210,7 +229,8 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 function StatCard({ title, value, icon: Icon, trend, trendColor = "text-bento-text-sub" }: any) {

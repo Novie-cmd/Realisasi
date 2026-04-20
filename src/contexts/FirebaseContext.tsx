@@ -13,7 +13,8 @@ import {
   deleteDoc, 
   query, 
   orderBy,
-  writeBatch
+  writeBatch,
+  getDocFromServer
 } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError } from '../lib/firebase';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
@@ -70,7 +71,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setSyncError(`Terjadi kesalahan sinkronisasi (${errorDetail.error}). Periksa hak akses akun ${user?.email}.`);
       } catch {
         console.error("Async Operation Error:", err);
-        setSyncError(`Gagal sinkronisasi data: ${err.message || 'Error tidak dikenal'}.`);
+        setSyncError(`Gagal sinkronisasi data: ${err.code || 'Error'} - ${err.message || 'Periksa koneksi atau hak akses'}.`);
       }
     }
   };
@@ -135,10 +136,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
+      console.error("SKPD Sync Error:", err.code, err.message);
       handleAsyncError(err);
-      if (syncError === null) {
-        setSyncError("Gagal sinkronisasi SKPD. Periksa koneksi atau hak akses.");
-      }
       setDataLoading(prev => ({ ...prev, skpds: false }));
     });
 
@@ -159,10 +158,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
+      console.error("Anggaran Sync Error:", err.code, err.message);
       handleAsyncError(err);
-      if (syncError === null) {
-        setSyncError("Gagal sinkronisasi Anggaran. Periksa koneksi atau hak akses.");
-      }
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     });
 
@@ -187,10 +184,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
+      console.error("Realisasi Sync Error:", err.code, err.message);
       handleAsyncError(err);
-      if (syncError === null) {
-        setSyncError("Gagal sinkronisasi Realisasi. Periksa koneksi atau hak akses.");
-      }
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     });
 

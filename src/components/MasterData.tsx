@@ -9,7 +9,8 @@ import {
   ListOrdered,
   Database,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  TrendingUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SKPD, Anggaran } from '../lib/types';
@@ -20,7 +21,7 @@ const ITEMS_PER_PAGE = 50;
 
 export default function MasterData() {
   const { 
-    skpds, anggarans, dataLoading,
+    skpds, anggarans, dataLoading, quotaExceeded,
     saveSKPDsBulk, saveAnggaransBulk, 
     deleteSKPD, deleteAnggaran,
     deleteAllSKPDs, deleteAllAnggarans
@@ -267,7 +268,7 @@ export default function MasterData() {
                 setIsSaving(false);
               }
             }}
-            disabled={isSaving || (tab === 'skpd' ? skpds.length === 0 : anggarans.length === 0)}
+            disabled={isSaving || quotaExceeded || (tab === 'skpd' ? skpds.length === 0 : anggarans.length === 0)}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" />
@@ -286,7 +287,7 @@ export default function MasterData() {
           </div>
           <label className={cn(
             "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm",
-            isSaving ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
+            (isSaving || quotaExceeded) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
           )}>
             {isSaving ? (
               <>
@@ -303,7 +304,7 @@ export default function MasterData() {
               type="file" 
               accept=".xlsx,.xls" 
               className="hidden" 
-              disabled={isSaving}
+              disabled={isSaving || quotaExceeded}
               onChange={tab === 'skpd' ? handleImportSKPD : handleImportAnggaran}
             />
           </label>
@@ -344,7 +345,7 @@ export default function MasterData() {
               </tr>
             </thead>
             <tbody className="divide-y divide-bento-border">
-              {(tab === 'skpd' ? dataLoading.skpds : dataLoading.anggarans) && (
+              {(tab === 'skpd' ? dataLoading.skpds : dataLoading.anggarans) && !quotaExceeded && (
                 <tr>
                   <td colSpan={tab === 'skpd' ? 3 : 5} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center gap-3">
@@ -354,7 +355,18 @@ export default function MasterData() {
                   </td>
                 </tr>
               )}
-              {!(tab === 'skpd' ? dataLoading.skpds : dataLoading.anggarans) && currentData.length === 0 && (
+              {quotaExceeded && (
+                <tr>
+                   <td colSpan={tab === 'skpd' ? 3 : 5} className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-red-500">
+                      <TrendingUp className="w-10 h-10 rotate-180 opacity-50" />
+                      <p className="text-sm font-bold uppercase tracking-widest">Batas Kuota Tercapai</p>
+                      <p className="text-xs opacity-70">Sistem hanya dapat membaca data lokal. Penulisan data baru akan aktif kembali besok.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!(tab === 'skpd' ? dataLoading.skpds : dataLoading.anggarans) && !quotaExceeded && currentData.length === 0 && (
                 <tr>
                   <td colSpan={tab === 'skpd' ? 3 : 5} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center gap-3 text-bento-text-sub opacity-50">
