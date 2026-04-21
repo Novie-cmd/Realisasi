@@ -5,6 +5,7 @@ import {
   Download, 
   ChevronDown, 
   ChevronUp,
+  ChevronRight,
   Filter,
   CheckCircle2,
   Search
@@ -20,6 +21,9 @@ export default function Reports() {
   const { skpds, anggarans, realisasis } = useFirebase();
   const [type, setType] = useState<ReportType>('skpd');
   const [selectedSkpdId, setSelectedSkpdId] = useState<string>('');
+  const [programFilter, setProgramFilter] = useState<string>('');
+  const [kegiatanFilter, setKegiatanFilter] = useState<string>('');
+  const [subKegiatanFilter, setSubKegiatanFilter] = useState<string>('');
   const [accountSearch, setAccountSearch] = useState<string>('');
   const [skpdSearch, setSkpdSearch] = useState<string>('');
   const [showSkpdList, setShowSkpdList] = useState(false);
@@ -33,6 +37,10 @@ export default function Reports() {
   const filteredAnggarans = useMemo(() => {
     let result = (anggarans || []);
     if (selectedSkpdId) result = result.filter(a => a?.skpdId === selectedSkpdId);
+    if (programFilter) result = result.filter(a => a?.namaProgram === programFilter);
+    if (kegiatanFilter) result = result.filter(a => a?.namaKegiatan === kegiatanFilter);
+    if (subKegiatanFilter) result = result.filter(a => a?.namaSubKegiatan === subKegiatanFilter);
+    
     if (accountSearch) {
       result = result.filter(a => 
         (a?.namaAkun || '').toLowerCase().includes(accountSearch.toLowerCase()) ||
@@ -40,27 +48,31 @@ export default function Reports() {
       );
     }
     return result;
-  }, [anggarans, selectedSkpdId, accountSearch]);
+  }, [anggarans, selectedSkpdId, accountSearch, programFilter, kegiatanFilter, subKegiatanFilter]);
 
   const filteredRealisasis = useMemo(() => {
     let result = (realisasis || []);
-    if (selectedSkpdId) {
+    const anggaranMap = new Map((anggarans || []).map(a => [a.id, a]));
+
+    if (selectedSkpdId || programFilter || kegiatanFilter || subKegiatanFilter || accountSearch) {
       result = result.filter(r => {
-        const a = (anggarans || []).find(ang => ang?.id === r?.anggaranId);
-        return a?.skpdId === selectedSkpdId;
-      });
-    }
-    if (accountSearch) {
-      result = result.filter(r => {
-        const a = (anggarans || []).find(ang => ang?.id === r?.anggaranId);
-        return a && (
+        const a = anggaranMap.get(r.anggaranId);
+        if (!a) return false;
+
+        const matchesSkpd = !selectedSkpdId || a.skpdId === selectedSkpdId;
+        const matchesProgram = !programFilter || a.namaProgram === programFilter;
+        const matchesKegiatan = !kegiatanFilter || a.namaKegiatan === kegiatanFilter;
+        const matchesSub = !subKegiatanFilter || a.namaSubKegiatan === subKegiatanFilter;
+        const matchesSearch = !accountSearch || (
           (a.namaAkun || '').toLowerCase().includes(accountSearch.toLowerCase()) ||
           (a.kodeAkun || '').toLowerCase().includes(accountSearch.toLowerCase())
         );
+
+        return matchesSkpd && matchesProgram && matchesKegiatan && matchesSub && matchesSearch;
       });
     }
     return result;
-  }, [realisasis, anggarans, selectedSkpdId, accountSearch]);
+  }, [realisasis, anggarans, selectedSkpdId, accountSearch, programFilter, kegiatanFilter, subKegiatanFilter]);
 
   const reportData = useMemo(() => {
     // Optimasi: Buat lookup maps di awal agar tidak ada O(N^2)
@@ -171,7 +183,7 @@ export default function Reports() {
         persen: data.pagu > 0 ? data.realisasi / data.pagu : 0
       })).sort((a, b) => b.pagu - a.pagu);
     }
-  }, [type, skpds, anggarans, realisasis, filteredAnggarans, filteredRealisasis, selectedSkpdId, accountSearch]);
+  }, [type, skpds, anggarans, realisasis, filteredAnggarans, filteredRealisasis, selectedSkpdId, accountSearch, programFilter, kegiatanFilter, subKegiatanFilter]);
 
   const totals = useMemo(() => {
     return reportData.reduce((acc, curr) => ({
@@ -181,10 +193,85 @@ export default function Reports() {
     }), { pagu: 0, realisasi: 0, sisa: 0 });
   }, [reportData]);
 
+  const handleRowClick = (row: any) => {
+    if (type === 'akun') return;
+    if (type === 'skpd') {
+      setSelectedSkpdId(row.id);
+      setType('program');
+    } else if (type === 'program') {
+      setProgramFilter(row.label);
+      setType('kegiatan');
+    } else if (type === 'kegiatan') {
+      setKegiatanFilter(row.label);
+      setType('sub');
+    } else if (type === 'sub') {
+      setSubKegiatanFilter(row.label);
+      setType('akun');
+    }
+  };
+
+  const resetFilters = () => {
+    setSelectedSkpdId('');
+    setProgramFilter('');
+    setKegiatanFilter('');
+    setSubKegiatanFilter('');
+    setAccountSearch('');
+    setType('skpd');
+  };
+
   return (
     <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-3">
+          {(selectedSkpdId || programFilter || kegiatanFilter || subKegiatanFilter) && (
+            <div className="flex items-center gap-2 no-print">
+              <button 
+                onClick={resetFilters}
+                className="text-[9px] font-black text-bento-primary uppercase tracking-widest hover:underline px-2 py-1 bg-bento-primary/5 rounded border border-bento-primary/10"
+              >
+                Reset Explorer
+              </button>
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 max-w-full no-scrollbar">
+                {selectedSkpdId && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <ChevronRight className="w-3 h-3 text-bento-text-sub" />
+                    <div className="flex items-center bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100 text-[10px] font-bold">
+                      {skpds.find(s => s.id === selectedSkpdId)?.nama}
+                      <button onClick={() => { resetFilters(); }} className="ml-1.5 hover:text-emerald-900 opacity-60">×</button>
+                    </div>
+                  </div>
+                )}
+                {programFilter && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <ChevronRight className="w-3 h-3 text-bento-text-sub" />
+                    <div className="flex items-center bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 text-[10px] font-bold">
+                      {programFilter}
+                      <button onClick={() => { setProgramFilter(''); setKegiatanFilter(''); setSubKegiatanFilter(''); setType('program'); }} className="ml-1.5 hover:text-blue-900 opacity-60">×</button>
+                    </div>
+                  </div>
+                )}
+                {kegiatanFilter && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <ChevronRight className="w-3 h-3 text-bento-text-sub" />
+                    <div className="flex items-center bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 text-[10px] font-bold">
+                      {kegiatanFilter}
+                      <button onClick={() => { setKegiatanFilter(''); setSubKegiatanFilter(''); setType('kegiatan'); }} className="ml-1.5 hover:text-amber-900 opacity-60">×</button>
+                    </div>
+                  </div>
+                )}
+                {subKegiatanFilter && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <ChevronRight className="w-3 h-3 text-bento-text-sub" />
+                    <div className="flex items-center bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 text-[10px] font-bold">
+                      {subKegiatanFilter}
+                      <button onClick={() => { setSubKegiatanFilter(''); setType('sub'); }} className="ml-1.5 hover:text-purple-900 opacity-60">×</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap bg-bento-border/30 p-1 rounded-xl border border-bento-border w-fit gap-1">
             <button 
               onClick={() => setType('skpd')}
@@ -303,6 +390,7 @@ export default function Reports() {
             </div>
           </div>
         </div>
+      </div>
 
         <button 
           onClick={() => window.print()}
@@ -366,7 +454,14 @@ export default function Reports() {
             </thead>
             <tbody className="divide-y divide-bento-border">
               {reportData.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/10">
+                <tr 
+                  key={row.id} 
+                  className={cn(
+                    "hover:bg-slate-50/5 transition-colors group",
+                    type !== 'akun' && "cursor-pointer"
+                  )}
+                  onClick={() => handleRowClick(row)}
+                >
                   <td className="px-8 py-5">
                     <div className="flex flex-col">
                       <span className="text-sm font-bold text-bento-accent">{row.label}</span>

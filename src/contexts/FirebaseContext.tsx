@@ -200,16 +200,29 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   // Proactive Connection Test
   useEffect(() => {
     async function testConnection() {
+      // Fallback: Force ready after 5s to avoid permanent "searching" state
+      const fallbackTimer = setTimeout(() => {
+        setDbReady((prev) => {
+          if (!prev) console.log("Connection check timed out, forcing ready state.");
+          return true;
+        });
+      }, 5000);
+
       try {
-        await getDocFromServer(doc(db, 'system', 'connection_check'));
+        await getDocFromServer(doc(db, 'test', 'connection'));
+        clearTimeout(fallbackTimer);
         setDbReady(true);
         console.log("Firebase connection established.");
       } catch (error: any) {
-        if (error.code === 'resource-exhausted') {
+        clearTimeout(fallbackTimer);
+        if (error.code === 'resource-exhausted' || error.message?.includes('quota')) {
           setQuotaExceeded(true);
-          setDbReady(true); // Connected but quota hit
+          setDbReady(true);
+        } else if (error.code === 'permission-denied') {
+          setDbReady(true);
         } else {
           console.warn("Firebase connection test warning:", error);
+          setDbReady(true);
         }
       }
     }
