@@ -24,7 +24,7 @@ export default function MasterData() {
     skpds, anggarans, dataLoading, quotaExceeded,
     saveSKPDsBulk, saveAnggaransBulk, 
     deleteSKPD, deleteAnggaran,
-    deleteAllSKPDs, deleteAllAnggarans
+    deleteAllSKPDs, deleteAllAnggarans, clearAllData
   } = useFirebase();
 
   const [tab, setTab] = useState<'skpd' | 'anggaran'>('skpd');
@@ -256,6 +256,21 @@ export default function MasterData() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button 
+            onClick={async () => {
+              if (window.confirm('PERINGATAN KRITIKAL: Apakah Anda yakin ingin menghapus SELURUH data sistem (SKPD, Anggaran, & Realisasi)? Tindakan ini permanen dan tidak dapat dibatalkan.')) {
+                setIsSaving(true);
+                await clearAllData();
+                setIsSaving(false);
+              }
+            }}
+            disabled={isSaving || (skpds.length === 0 && anggarans.length === 0)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Hapus Seluruh Data</span>
+          </button>
+
           <button 
             onClick={async () => {
               const msg = tab === 'skpd' 

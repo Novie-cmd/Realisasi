@@ -18,7 +18,8 @@ import {
   Wallet, 
   AlertCircle,
   Database,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, formatPercent, cn } from '../lib/utils';
@@ -28,7 +29,8 @@ import { useFirebase } from '../contexts/FirebaseContext';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function Dashboard() {
-  const { skpds, anggarans, realisasis, quotaExceeded, resetQuotaStatus } = useFirebase();
+  const { skpds, anggarans, realisasis, quotaExceeded, resetQuotaStatus, clearAllData } = useFirebase();
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const stats = useMemo(() => {
     if (!anggarans || !realisasis) return { totalAnggaran: 0, totalRealisasi: 0, totalSisa: 0, persentase: 0 };
     
@@ -102,6 +104,27 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-12">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-bento-accent tracking-tighter uppercase">Executive Dashboard</h2>
+          <p className="text-xs text-bento-text-sub font-bold uppercase tracking-widest mt-1">Sistem Informasi Realisasi Anggaran 2026</p>
+        </div>
+        <button 
+          onClick={async () => {
+            if (window.confirm('PERINGATAN KRITIKAL: Apakah Anda yakin ingin menghapus SELURUH data sistem (SKPD, Anggaran, & Realisasi)? Tindakan ini permanen dan tidak dapat dibatalkan.')) {
+              setIsDeleting(true);
+              await clearAllData();
+              setIsDeleting(false);
+            }
+          }}
+          disabled={isDeleting || (skpds.length === 0 && anggarans.length === 0)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>{isDeleting ? 'Menghapus...' : 'Kosongkan Database'}</span>
+        </button>
+      </div>
+
       {quotaExceeded && (
         <motion.div 
           initial={{ height: 0, opacity: 0 }}

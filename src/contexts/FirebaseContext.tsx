@@ -42,6 +42,7 @@ interface FirebaseContextType {
   deleteAllRealisasi: () => Promise<void>;
   deleteAllSKPDs: () => Promise<void>;
   deleteAllAnggarans: () => Promise<void>;
+  clearAllData: () => Promise<void>;
   resetQuotaStatus: () => void;
   setSyncError: (error: string | null) => void;
 }
@@ -645,6 +646,25 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearAllData = async () => {
+    // 1. Clear Local State immediately for responsiveness
+    setSkpds([]);
+    setAnggarans([]);
+    setRealisasis([]);
+    
+    // Clear backups
+    localStorage.removeItem('backup_skpds');
+    localStorage.removeItem('backup_anggarans');
+    localStorage.removeItem('backup_realisasis');
+
+    if (quotaExceeded) return;
+
+    // 2. Perform deletions in Firestore
+    await deleteAllRealisasi();
+    await deleteAllAnggarans();
+    await deleteAllSKPDs();
+  };
+
   const resetQuotaStatus = () => {
     localStorage.removeItem('quota_exceeded');
     setQuotaExceeded(false);
@@ -658,6 +678,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,
       saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi,
+      clearAllData,
       resetQuotaStatus,
       setSyncError
     }}>
