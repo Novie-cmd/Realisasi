@@ -277,38 +277,16 @@ export default function Transactions() {
                   })}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-bento-text-sub uppercase tracking-widest mb-2">Tanggal</label>
-                  <input 
-                    type="date"
-                    required
-                    value={formData.tanggal}
-                    onChange={e => setFormData({...formData, tanggal: e.target.value})}
-                    className="w-full bg-slate-50 border border-bento-border rounded-xl px-4 py-3 text-sm font-bold text-bento-accent focus:ring-2 focus:ring-bento-primary/20 outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-bento-text-sub uppercase tracking-widest mb-2">Nilai (Rp)</label>
-                  <input 
-                    type="number"
-                    required
-                    placeholder="0"
-                    value={formData.nilai || ''}
-                    onChange={e => setFormData({...formData, nilai: Number(e.target.value)})}
-                    className="w-full bg-slate-50 border border-bento-border rounded-xl px-4 py-3 text-sm font-bold text-bento-primary focus:ring-2 focus:ring-bento-primary/20 outline-none font-bold transition-all"
-                  />
-                </div>
-              </div>
               <div>
-                <label className="block text-[11px] font-bold text-bento-text-sub uppercase tracking-widest mb-2">Keterangan</label>
-                <textarea 
-                  rows={3}
-                  value={formData.keterangan}
-                  onChange={e => setFormData({...formData, keterangan: e.target.value})}
-                  className="w-full bg-slate-50 border border-bento-border rounded-xl px-4 py-3 text-sm font-medium text-bento-accent focus:ring-2 focus:ring-bento-primary/20 outline-none resize-none transition-all"
-                  placeholder="Contoh: Pembayaran Gaji Pegawai..."
-                ></textarea>
+                <label className="block text-[11px] font-bold text-bento-text-sub uppercase tracking-widest mb-2">Nilai (Rp)</label>
+                <input 
+                  type="number"
+                  required
+                  placeholder="0"
+                  value={formData.nilai || ''}
+                  onChange={e => setFormData({...formData, nilai: Number(e.target.value)})}
+                  className="w-full bg-slate-50 border border-bento-border rounded-xl px-4 py-3 text-sm font-bold text-bento-primary focus:ring-2 focus:ring-bento-primary/20 outline-none font-bold transition-all"
+                />
               </div>
               <div className="flex gap-4 pt-4">
                 <button 
@@ -335,9 +313,7 @@ export default function Transactions() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-bento-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">Tanggal</th>
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">Akun / SKPD</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest">Keterangan</th>
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest text-right">Nilai</th>
                 <th className="px-8 py-5 text-[11px] font-bold text-bento-text-sub uppercase tracking-widest text-right">Opsi</th>
               </tr>
@@ -345,7 +321,7 @@ export default function Transactions() {
             <tbody className="divide-y divide-bento-border">
               {quotaExceeded && (
                 <tr>
-                   <td colSpan={5} className="px-8 py-20 text-center">
+                   <td colSpan={3} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center gap-3 text-red-500">
                       <TrendingUp className="w-10 h-10 rotate-180 opacity-50" />
                       <p className="text-sm font-bold uppercase tracking-widest">Batas Kuota Tercapai</p>
@@ -359,20 +335,11 @@ export default function Transactions() {
                 const skpd = skpds.find(s => s.id === anggaran?.skpdId);
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-all duration-200">
-                    <td className="px-8 py-5 text-bento-text-sub font-mono font-bold">
-                      {(() => {
-                        const d = new Date(item.tanggal);
-                        return isValid(d) ? format(d, 'dd/MM/yyyy') : item.tanggal;
-                      })()}
-                    </td>
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
                         <span className="font-bold text-bento-accent leading-tight">{anggaran?.namaAkun || 'No Account'}</span>
                         <span className="text-[10px] text-bento-text-sub font-bold uppercase tracking-tighter truncate max-w-[200px]">{skpd?.nama}</span>
                       </div>
-                    </td>
-                    <td className="px-8 py-5 text-bento-text-sub font-medium italic">
-                      {item.keterangan || '-'}
                     </td>
                     <td className="px-8 py-5 text-right">
                       <span className="font-extrabold text-bento-success">
@@ -392,7 +359,7 @@ export default function Transactions() {
               })}
               {filteredRealisasi.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
+                  <td colSpan={3} className="px-8 py-20 text-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-bento-border border-dashed">
                       <ArrowRightLeft className="w-7 h-7 text-bento-text-sub/40" />
                     </div>
