@@ -28,6 +28,8 @@ interface FirebaseContextType {
   anggarans: Anggaran[];
   realisasis: Realisasi[];
   quotaExceeded: boolean;
+  isSyncing: boolean;
+  syncProgress: number; // 0 to 100
   login: () => Promise<void>;
   logout: () => Promise<void>;
   saveSKPD: (data: SKPD) => Promise<void>;
@@ -101,6 +103,21 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
     return false;
   });
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+
+  // Prevent accidental close/refresh during sync
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSyncing) {
+        e.preventDefault();
+        e.returnValue = ''; // Standard browser prompt
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isSyncing]);
 
   // Persist quota status
   useEffect(() => {
@@ -213,28 +230,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
-      // Logic Pencegahan: Jika data di server kosong tetapi kita punya data lokal (backup),
-      // jangan langsung hapus. Biarkan data lokal tetap ada kecuali pengguna sengaja menghapus.
-      if (snapshot.empty) {
-        setSkpds(prev => (prev.length > 0 ? prev : []));
-        setDataLoading(prev => ({ ...prev, skpds: false }));
-        return;
-      }
-
-      setSkpds(prev => {
-        const map = new Map<string, SKPD>((prev || []).filter(Boolean).map(i => [i.id, i]));
-        let changed = false;
-        snapshot.docChanges().forEach((change) => {
-          const data = { id: change.doc.id, ...change.doc.data() } as SKPD;
-          if (change.type === 'removed') {
-            if (map.delete(data.id)) changed = true;
-          } else if (data && data.id) {
-            map.set(data.id, data);
-            changed = true;
-          }
-        });
-        return changed ? Array.from(map.values()) : prev;
-      });
+      // Don't overwrite local state if we have pending writes (e.g. bulk import in progress)
+      if (snapshot.metadata.hasPendingWrites) return;
+      
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SKPD));
+      setSkpds(data);
       setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
       if (err.code === 'resource-exhausted') {
@@ -247,26 +247,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
-      if (snapshot.empty) {
-        setAnggarans(prev => (prev.length > 0 ? prev : []));
-        setDataLoading(prev => ({ ...prev, anggarans: false }));
-        return;
-      }
+      // Don't overwrite local state if we have pending writes
+      if (snapshot.metadata.hasPendingWrites) return;
 
-      setAnggarans(prev => {
-        const map = new Map<string, Anggaran>((prev || []).filter(Boolean).map(i => [i.id, i]));
-        let changed = false;
-        snapshot.docChanges().forEach((change) => {
-          const data = { id: change.doc.id, ...change.doc.data() } as Anggaran;
-          if (change.type === 'removed') {
-            if (map.delete(data.id)) changed = true;
-          } else if (data && data.id) {
-            map.set(data.id, data);
-            changed = true;
-          }
-        });
-        return changed ? Array.from(map.values()) : prev;
-      });
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Anggaran));
+      setAnggarans(data);
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
       if (err.code === 'resource-exhausted') {
@@ -279,30 +264,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
-      if (snapshot.empty) {
-        setRealisasis(prev => (prev.length > 0 ? prev : []));
-        setDataLoading(prev => ({ ...prev, realisasis: false }));
-        return;
-      }
+      // Don't overwrite local state if we have pending writes
+      if (snapshot.metadata.hasPendingWrites) return;
 
-      setRealisasis(prev => {
-        const map = new Map<string, Realisasi>((prev || []).filter(Boolean).map(i => [i.id, i]));
-        let changed = false;
-        snapshot.docChanges().forEach((change) => {
-          const data = { id: change.doc.id, ...change.doc.data() } as Realisasi;
-          if (change.type === 'removed') {
-            if (map.delete(data.id)) changed = true;
-          } else if (data && data.id) {
-            map.set(data.id, data);
-            changed = true;
-          }
-        });
-        // Realisasis should maintain sort order from query
-        if (changed) {
-          return Array.from(map.values()).sort((a, b) => (b?.tanggal || '').localeCompare(a?.tanggal || ''));
-        }
-        return prev;
-      });
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Realisasi));
+      setRealisasis(data);
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
       if (err.code === 'resource-exhausted') {
@@ -363,27 +329,30 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (quotaExceeded) return;
 
+    setIsSyncing(true);
+    setSyncProgress(0);
+
     const chunks = [];
     for (let i = 0; i < data.length; i += 500) {
       chunks.push(data.slice(i, i + 500));
     }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        batch.set(doc(db, 'skpds', item.id), item);
-      });
-      try {
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          batch.set(doc(db, 'skpds', item.id), item);
+        });
+        
         await batch.commit();
-      } catch (err) {
-        handleAsyncError(err);
-        try {
-          handleFirestoreError(err, 'write', 'skpds/bulk');
-        } catch (e: any) {
-          if (e.message === 'QUOTA_EXCEEDED') break; // Stop trying if quota hit
-          throw e;
-        }
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
       }
+    } catch (err) {
+      handleAsyncError(err);
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
     }
   };
 
@@ -412,27 +381,34 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (quotaExceeded) return;
 
+    setIsSyncing(true);
+    setSyncProgress(0);
+
     const chunks = [];
     for (let i = 0; i < listToDelete.length; i += 500) {
       chunks.push(listToDelete.slice(i, i + 500));
     }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        batch.delete(doc(db, 'skpds', item.id));
-      });
-      try {
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          batch.delete(doc(db, 'skpds', item.id));
+        });
         await batch.commit();
-      } catch (err) {
-        handleAsyncError(err);
-        try {
-          handleFirestoreError(err, 'delete', 'skpds/bulk');
-        } catch (e: any) {
-          if (e.message === 'QUOTA_EXCEEDED') break;
-          throw e;
-        }
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
       }
+    } catch (err) {
+      handleAsyncError(err);
+      try {
+        handleFirestoreError(err, 'delete', 'skpds/bulk');
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
     }
   };
 
@@ -467,28 +443,31 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (quotaExceeded) return;
 
+    setIsSyncing(true);
+    setSyncProgress(0);
+
     // Firestore batches are limited to 500 ops
     const chunks = [];
     for (let i = 0; i < data.length; i += 500) {
       chunks.push(data.slice(i, i + 500));
     }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        batch.set(doc(db, 'anggarans', item.id), item);
-      });
-      try {
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          batch.set(doc(db, 'anggarans', item.id), item);
+        });
+        
         await batch.commit();
-      } catch (err) {
-        handleAsyncError(err);
-        try {
-          handleFirestoreError(err, 'write', 'anggarans/bulk');
-        } catch (e: any) {
-          if (e.message === 'QUOTA_EXCEEDED') break;
-          throw e;
-        }
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
       }
+    } catch (err) {
+      handleAsyncError(err);
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
     }
   };
 
@@ -517,27 +496,34 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (quotaExceeded) return;
 
+    setIsSyncing(true);
+    setSyncProgress(0);
+
     const chunks = [];
     for (let i = 0; i < listToDelete.length; i += 500) {
       chunks.push(listToDelete.slice(i, i + 500));
     }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        batch.delete(doc(db, 'anggarans', item.id));
-      });
-      try {
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          batch.delete(doc(db, 'anggarans', item.id));
+        });
         await batch.commit();
-      } catch (err) {
-        handleAsyncError(err);
-        try {
-          handleFirestoreError(err, 'delete', 'anggarans/bulk');
-        } catch (e: any) {
-          if (e.message === 'QUOTA_EXCEEDED') break;
-          throw e;
-        }
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
       }
+    } catch (err) {
+      handleAsyncError(err);
+      try {
+        handleFirestoreError(err, 'delete', 'anggarans/bulk');
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
     }
   };
 
@@ -568,32 +554,35 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     setRealisasis(prev => {
       const map = new Map<string, Realisasi>(prev.map(i => [i.id, i]));
       data.forEach(item => map.set(item.id, item));
-      return Array.from(map.values()).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+      return Array.from(map.values()).sort((a, b) => (b?.tanggal || '').localeCompare(a?.tanggal || ''));
     });
 
     if (quotaExceeded) return;
+
+    setIsSyncing(true);
+    setSyncProgress(0);
 
     const chunks = [];
     for (let i = 0; i < data.length; i += 500) {
       chunks.push(data.slice(i, i + 500));
     }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        batch.set(doc(db, 'realisasis', item.id), item);
-      });
-      try {
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          batch.set(doc(db, 'realisasis', item.id), item);
+        });
+        
         await batch.commit();
-      } catch (err) {
-        handleAsyncError(err);
-        try {
-          handleFirestoreError(err, 'write', 'realisasis/bulk');
-        } catch (e: any) {
-          if (e.message === 'QUOTA_EXCEEDED') break;
-          throw e;
-        }
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
       }
+    } catch (err) {
+      handleAsyncError(err);
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
     }
   };
 
@@ -622,27 +611,29 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (quotaExceeded) return;
 
+    setIsSyncing(true);
+    setSyncProgress(0);
+
     const chunks = [];
     for (let i = 0; i < listToDelete.length; i += 500) {
       chunks.push(listToDelete.slice(i, i + 500));
     }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        batch.delete(doc(db, 'realisasis', item.id));
-      });
-      try {
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          batch.delete(doc(db, 'realisasis', item.id));
+        });
         await batch.commit();
-      } catch (err) {
-        handleAsyncError(err);
-        try {
-          handleFirestoreError(err, 'delete', 'realisasis/bulk');
-        } catch (e: any) {
-          if (e.message === 'QUOTA_EXCEEDED') break;
-          throw e;
-        }
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
       }
+    } catch (err) {
+      handleAsyncError(err);
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
     }
   };
 
@@ -659,10 +650,55 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     if (quotaExceeded) return;
 
-    // 2. Perform deletions in Firestore
-    await deleteAllRealisasi();
-    await deleteAllAnggarans();
-    await deleteAllSKPDs();
+    setIsSyncing(true);
+    setSyncProgress(0);
+
+    try {
+      // 2. Perform deletions in Firestore sequentially to handle progress
+      // Deleting Realisasi
+      const rlCopy = [...realisasis];
+      if (rlCopy.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < rlCopy.length; i += 500) chunks.push(rlCopy.slice(i, i + 500));
+        for (let i = 0; i < chunks.length; i++) {
+          const batch = writeBatch(db);
+          chunks[i].forEach(item => batch.delete(doc(db, 'realisasis', item.id)));
+          await batch.commit();
+          setSyncProgress(Math.round(((i + 1) / chunks.length) * 33)); // First 33%
+        }
+      }
+
+      // Deleting Anggaran
+      const agCopy = [...anggarans];
+      if (agCopy.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < agCopy.length; i += 500) chunks.push(agCopy.slice(i, i + 500));
+        for (let i = 0; i < chunks.length; i++) {
+          const batch = writeBatch(db);
+          chunks[i].forEach(item => batch.delete(doc(db, 'anggarans', item.id)));
+          await batch.commit();
+          setSyncProgress(33 + Math.round(((i + 1) / chunks.length) * 33)); // Up to 66%
+        }
+      }
+
+      // Deleting SKPD
+      const skCopy = [...skpds];
+      if (skCopy.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < skCopy.length; i += 500) chunks.push(skCopy.slice(i, i + 500));
+        for (let i = 0; i < chunks.length; i++) {
+          const batch = writeBatch(db);
+          chunks[i].forEach(item => batch.delete(doc(db, 'skpds', item.id)));
+          await batch.commit();
+          setSyncProgress(66 + Math.round(((i + 1) / chunks.length) * 34)); // Up to 100%
+        }
+      }
+    } catch (err) {
+      handleAsyncError(err);
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(100);
+    }
   };
 
   const resetQuotaStatus = () => {
@@ -674,6 +710,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   return (
     <FirebaseContext.Provider value={{ 
       user, loading, syncError, dataLoading, skpds, anggarans, realisasis, quotaExceeded,
+      isSyncing, syncProgress,
       login, logout, 
       saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,

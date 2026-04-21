@@ -16,7 +16,8 @@ import {
   LogOut,
   ChevronRight,
   User as UserIcon,
-  LogIn
+  LogIn,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SKPD, Anggaran, Realisasi } from './lib/types';
@@ -32,6 +33,7 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 export default function App() {
   const { 
     user, loading, syncError, skpds, anggarans, realisasis, quotaExceeded,
+    isSyncing, syncProgress,
     login, logout, setSyncError, resetQuotaStatus,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
@@ -163,6 +165,34 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <AnimatePresence>
+          {isSyncing && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-bento-primary/10 border-b border-bento-primary/20 overflow-hidden"
+            >
+              <div className="px-10 py-2 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="w-4 h-4 text-bento-primary animate-spin" />
+                  <span className="text-[10px] font-black text-bento-primary uppercase tracking-widest">Sinkronisasi sedang berlangsung...</span>
+                </div>
+                <div className="flex items-center gap-3 flex-1 max-w-xs">
+                  <div className="flex-1 h-1.5 bg-bento-primary/20 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-bento-primary"
+                      animate={{ width: `${syncProgress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-black text-bento-primary w-8">{syncProgress}%</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {syncError && (
           <div className={cn(
             "border-b px-10 py-3 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-300",
