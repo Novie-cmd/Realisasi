@@ -42,6 +42,7 @@ interface FirebaseContextType {
   deleteAllRealisasi: () => Promise<void>;
   deleteAllSKPDs: () => Promise<void>;
   deleteAllAnggarans: () => Promise<void>;
+  resetQuotaStatus: () => void;
   setSyncError: (error: string | null) => void;
 }
 
@@ -592,6 +593,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetQuotaStatus = () => {
+    localStorage.removeItem('quota_exceeded');
+    setQuotaExceeded(false);
+    setSyncError(null);
+  };
+
   return (
     <FirebaseContext.Provider value={{ 
       user, loading, syncError, dataLoading, skpds, anggarans, realisasis, quotaExceeded,
@@ -599,6 +606,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,
       saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi,
+      resetQuotaStatus,
       setSyncError
     }}>
       {children}

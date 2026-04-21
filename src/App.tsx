@@ -32,7 +32,7 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 export default function App() {
   const { 
     user, loading, syncError, skpds, anggarans, realisasis, quotaExceeded,
-    login, logout, setSyncError,
+    login, logout, setSyncError, resetQuotaStatus,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
     saveRealisasi, saveRealisasisBulk, deleteRealisasi
@@ -189,15 +189,21 @@ export default function App() {
               >
                 <X className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => window.location.reload()}
-                className={cn(
-                  "px-3 py-1 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ml-2",
-                  quotaExceeded ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"
-                )}
-              >
-                Refresh Data
-              </button>
+              {quotaExceeded ? (
+                <button 
+                  onClick={() => resetQuotaStatus()}
+                  className="px-3 py-1 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-amber-700 transition-all ml-2"
+                >
+                  Coba Hubungkan Sekarang
+                </button>
+              ) : (
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-all ml-2"
+                >
+                  Coba Lagi
+                </button>
+              )}
             </div>
           </div>
         )}
