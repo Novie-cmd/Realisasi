@@ -47,6 +47,7 @@ interface FirebaseContextType {
   clearAllData: () => Promise<void>;
   resetQuotaStatus: () => void;
   setSyncError: (error: string | null) => void;
+  dbReady: boolean;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -106,6 +107,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
+  const [dbReady, setDbReady] = useState(false);
 
   // Prevent accidental close/refresh during sync
   useEffect(() => {
@@ -174,7 +176,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     setSyncProgress(0);
     
     try {
-      handleFirestoreError(err, 'list');
+      handleFirestoreError(err, 'write');
     } catch (e: any) {
       if (e.message === 'QUOTA_EXCEEDED') {
         if (!quotaExceeded) {
@@ -194,6 +196,25 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     }
   };
+
+  // Proactive Connection Test
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'system', 'connection_check'));
+        setDbReady(true);
+        console.log("Firebase connection established.");
+      } catch (error: any) {
+        if (error.code === 'resource-exhausted') {
+          setQuotaExceeded(true);
+          setDbReady(true); // Connected but quota hit
+        } else {
+          console.warn("Firebase connection test warning:", error);
+        }
+      }
+    }
+    testConnection();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -344,6 +365,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (!dbReady) {
+      setSyncError("Menunggu koneksi database... Sinkronisasi akan berlanjut otomatis setelah terhubung.");
+    }
+
     setIsSyncing(true);
     setSyncProgress(0.1); // Even lower start for immediate tiny move
 
@@ -355,6 +380,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
+        // Redundant check in loop
+        if (localStorage.getItem('quota_exceeded') === 'true') break;
+
         const chunk = chunks[i];
         const batch = writeBatch(db);
         chunk.forEach(item => {
@@ -470,6 +498,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
        return;
     }
 
+    if (!dbReady) {
+      setSyncError("Menunggu koneksi database... Sinkronisasi akan berlanjut otomatis setelah terhubung.");
+    }
+
     setIsSyncing(true);
     setSyncProgress(0.1);
 
@@ -481,6 +513,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
+        if (localStorage.getItem('quota_exceeded') === 'true') break;
+
         const chunk = chunks[i];
         const batch = writeBatch(db);
         chunk.forEach(item => {
@@ -594,6 +628,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
        return;
     }
 
+    if (!dbReady) {
+      setSyncError("Menunggu koneksi database... Sinkronisasi akan berlanjut otomatis setelah terhubung.");
+    }
+
     setIsSyncing(true);
     setSyncProgress(0.1);
 
@@ -605,6 +643,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
+        if (localStorage.getItem('quota_exceeded') === 'true') break;
+
         const chunk = chunks[i];
         const batch = writeBatch(db);
         chunk.forEach(item => {
@@ -772,7 +812,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi,
       clearAllData,
       resetQuotaStatus,
-      setSyncError
+      setSyncError,
+      dbReady
     }}>
       {children}
     </FirebaseContext.Provider>

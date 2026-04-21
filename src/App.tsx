@@ -33,7 +33,7 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 export default function App() {
   const { 
     user, loading, syncError, skpds, anggarans, realisasis, quotaExceeded,
-    isSyncing, syncProgress,
+    isSyncing, syncProgress, dbReady,
     login, logout, setSyncError, resetQuotaStatus,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
@@ -139,6 +139,18 @@ export default function App() {
         </nav>
 
         <div className="p-6 border-t border-white/10 space-y-4">
+          <div className="bento-group-label">{sidebarOpen ? 'Koneksi Database' : '•••'}</div>
+          <div className={cn(
+            "flex items-center gap-3 px-4 py-2 rounded-xl transition-all text-[11px] font-bold uppercase tracking-wider",
+            dbReady ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+          )}>
+            <div className={cn(
+               "w-2 h-2 rounded-full",
+               dbReady ? "bg-emerald-500 animate-pulse" : "bg-amber-500 animate-bounce"
+            )}></div>
+            {sidebarOpen && (dbReady ? (quotaExceeded ? 'Kuota Terlewati' : 'Terhubung Cloud') : 'Mencari Koneksi...')}
+          </div>
+
           <div className="bento-group-label">{sidebarOpen ? 'Pengaturan' : '•••'}</div>
           <button 
             onClick={logout}
@@ -176,7 +188,9 @@ export default function App() {
               <div className="px-10 py-2 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <RefreshCw className="w-4 h-4 text-bento-primary animate-spin" />
-                  <span className="text-[10px] font-black text-bento-primary uppercase tracking-widest">Sinkronisasi sedang berlangsung...</span>
+                  <span className="text-[10px] font-black text-bento-primary uppercase tracking-widest">
+                    {!dbReady ? 'Menunggu Koneksi...' : (quotaExceeded ? 'Mode Offline (Kuota Habis)' : 'Sinkronisasi berlangsung...')}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 flex-1 max-w-xs">
                   <div className="flex-1 h-1.5 bg-bento-primary/20 rounded-full overflow-hidden">
@@ -211,6 +225,14 @@ export default function App() {
               )}>{syncError}</p>
             </div>
             <div className="flex items-center gap-2">
+              {quotaExceeded && (
+                <button 
+                  onClick={resetQuotaStatus}
+                  className="px-3 py-1.5 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-colors shadow-sm mr-2"
+                >
+                  Coba Sinkron Ulang
+                </button>
+              )}
               <button 
                 onClick={() => setSyncError(null)}
                 className={cn(
