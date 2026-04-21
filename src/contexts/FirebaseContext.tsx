@@ -99,17 +99,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Save backups on change
+  // Save backups on change (including empty states)
   useEffect(() => {
-    if (skpds.length > 0) localStorage.setItem('backup_skpds', JSON.stringify(skpds));
+    localStorage.setItem('backup_skpds', JSON.stringify(skpds));
   }, [skpds]);
 
   useEffect(() => {
-    if (anggarans.length > 0) localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
+    localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
   }, [anggarans]);
 
   useEffect(() => {
-    if (realisasis.length > 0) localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
+    localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
   }, [realisasis]);
 
   const handleAsyncError = (err: any) => {
@@ -177,6 +177,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
+      // If snapshot is empty and we had data, we should clear it (unless quota hit)
+      if (snapshot.empty) {
+        setSkpds([]);
+        setDataLoading(prev => ({ ...prev, skpds: false }));
+        return;
+      }
+
       setSkpds(prev => {
         const map = new Map<string, SKPD>(prev.map(i => [i.id, i]));
         let changed = false;
@@ -203,6 +210,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
+      if (snapshot.empty) {
+        setAnggarans([]);
+        setDataLoading(prev => ({ ...prev, anggarans: false }));
+        return;
+      }
+
       setAnggarans(prev => {
         const map = new Map<string, Anggaran>(prev.map(i => [i.id, i]));
         let changed = false;
@@ -229,6 +242,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
+      if (snapshot.empty) {
+        setRealisasis([]);
+        setDataLoading(prev => ({ ...prev, realisasis: false }));
+        return;
+      }
+
       setRealisasis(prev => {
         const map = new Map<string, Realisasi>(prev.map(i => [i.id, i]));
         let changed = false;

@@ -30,50 +30,57 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 export default function Dashboard() {
   const { skpds, anggarans, realisasis, quotaExceeded, resetQuotaStatus } = useFirebase();
   const stats = useMemo(() => {
-    const totalAnggaran = anggarans.reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
-    const totalRealisasi = realisasis.reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
-    const totalSisa = totalAnggaran - totalRealisasi;
+    if (!anggarans || !realisasis) return { totalAnggaran: 0, totalRealisasi: 0, totalSisa: 0, persentase: 0 };
+    
+    const totalAnggaran = anggarans.reduce((sum, item) => sum + (Number(item?.pagu) || 0), 0);
+    const totalRealisasi = realisasis.reduce((sum, item) => sum + (Number(item?.nilai) || 0), 0);
+    const totalSisa = Math.max(0, totalAnggaran - totalRealisasi);
     const persentase = totalAnggaran > 0 ? totalRealisasi / totalAnggaran : 0;
 
     return { totalAnggaran, totalRealisasi, totalSisa, persentase };
   }, [anggarans, realisasis]);
 
   const chartData = useMemo(() => {
-    if (skpds.length === 0) return [];
+    if (!skpds || skpds.length === 0) return [];
+    
     return skpds.map(skpd => {
-      const skpdAnggaran = anggarans
-        .filter(a => a.skpdId === skpd.id)
-        .reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
+      const skpdAnggaran = (anggarans || [])
+        .filter(a => a?.skpdId === skpd?.id)
+        .reduce((sum, item) => sum + (Number(item?.pagu) || 0), 0);
       
-      const skpdRealisasi = realisasis
+      const skpdRealisasi = (realisasis || [])
         .filter(r => {
-          const anggaran = anggarans.find(a => a.id === r.anggaranId);
-          return anggaran?.skpdId === skpd.id;
+          const anggaran = (anggarans || []).find(a => a?.id === r?.anggaranId);
+          return anggaran?.skpdId === skpd?.id;
         })
-        .reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
+        .reduce((sum, item) => sum + (Number(item?.nilai) || 0), 0);
 
       return {
-        nama: skpd.nama,
+        nama: skpd?.nama || 'Unknown',
         Anggaran: skpdAnggaran,
         Realisasi: skpdRealisasi,
-        Sisa: skpdAnggaran - skpdRealisasi
+        Sisa: Math.max(0, skpdAnggaran - skpdRealisasi)
       };
     }).sort((a, b) => (b.Anggaran || 0) - (a.Anggaran || 0)).slice(0, 5);
   }, [skpds, anggarans, realisasis]);
 
   const pieData = useMemo(() => {
+    if (!realisasis || !anggarans) return [];
+    
     const data: Record<string, number> = {};
     realisasis.forEach(r => {
-      const anggaran = anggarans.find(a => a.id === r.anggaranId);
-      if (anggaran) {
-        data[anggaran.namaAkun] = (data[anggaran.namaAkun] || 0) + r.nilai;
+      const anggaran = anggarans.find(a => a?.id === r?.anggaranId);
+      if (anggaran && anggaran.namaAkun) {
+        data[anggaran.namaAkun] = (data[anggaran.namaAkun] || 0) + (r?.nilai || 0);
       }
     });
 
-    return Object.entries(data)
+    const result = Object.entries(data)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
+    
+    return result;
   }, [realisasis, anggarans]);
 
   return (
