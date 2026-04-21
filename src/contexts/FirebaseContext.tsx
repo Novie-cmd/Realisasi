@@ -342,9 +342,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(0.5); 
+    setSyncProgress(0.1); // Even lower start for immediate tiny move
 
-    const batchSize = 100; // Smaller size for more frequent UI updates
+    const batchSize = 25; // Much smaller for constant UI movement
     const chunks = [];
     for (let i = 0; i < data.length; i += batchSize) {
       chunks.push(data.slice(i, i + batchSize));
@@ -359,9 +359,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        // Use more granular progress with decimal
-        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
-        setSyncProgress(currentProgress);
+        // Constant progress updates
+        const prog = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(prog);
+        
+        // Small yield to keep UI responsive
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
       }
     } catch (err) {
       console.error("Bulk SKPD Sync Error:", err);
@@ -401,9 +404,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(0.5);
+    setSyncProgress(0.1);
 
-    const batchSize = 100;
+    const batchSize = 25;
     const chunks = [];
     for (let i = 0; i < listToDelete.length; i += batchSize) {
       chunks.push(listToDelete.slice(i, i + batchSize));
@@ -417,8 +420,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'skpds', item.id));
         });
         await batch.commit();
-        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
-        setSyncProgress(currentProgress);
+        const prog = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(prog);
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
       }
     } catch (err) {
       console.error("Bulk Delete SKPD Error:", err);
@@ -464,9 +468,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(0.5);
+    setSyncProgress(0.1);
 
-    const batchSize = 100;
+    const batchSize = 25;
     const chunks = [];
     for (let i = 0; i < data.length; i += batchSize) {
       chunks.push(data.slice(i, i + batchSize));
@@ -481,8 +485,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
-        setSyncProgress(currentProgress);
+        const prog = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(prog);
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
       }
     } catch (err) {
       console.error("Bulk Anggaran Sync Error:", err);
@@ -522,9 +527,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(0.5);
+    setSyncProgress(0.1);
 
-    const batchSize = 100;
+    const batchSize = 25;
     const chunks = [];
     for (let i = 0; i < listToDelete.length; i += batchSize) {
       chunks.push(listToDelete.slice(i, i + batchSize));
@@ -538,8 +543,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'anggarans', item.id));
         });
         await batch.commit();
-        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
-        setSyncProgress(currentProgress);
+        const prog = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(prog);
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
       }
     } catch (err) {
       console.error("Bulk Delete Anggaran Error:", err);
@@ -586,9 +592,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(0.5);
+    setSyncProgress(0.1);
 
-    const batchSize = 100;
+    const batchSize = 25;
     const chunks = [];
     for (let i = 0; i < data.length; i += batchSize) {
       chunks.push(data.slice(i, i + batchSize));
@@ -603,8 +609,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
-        setSyncProgress(currentProgress);
+        const prog = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(prog);
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
       }
     } catch (err) {
       console.error("Bulk Realisasi Sync Error:", err);
@@ -644,9 +651,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(0.5);
+    setSyncProgress(0.1);
 
-    const batchSize = 100;
+    const batchSize = 25;
     const chunks = [];
     for (let i = 0; i < listToDelete.length; i += batchSize) {
       chunks.push(listToDelete.slice(i, i + batchSize));
@@ -660,8 +667,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'realisasis', item.id));
         });
         await batch.commit();
-        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
-        setSyncProgress(currentProgress);
+        const prog = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(prog);
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 50));
       }
     } catch (err) {
       console.error("Bulk Delete Realisasi Error:", err);
