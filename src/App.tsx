@@ -31,7 +31,7 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 
 export default function App() {
   const { 
-    user, loading, syncError, skpds, anggarans, realisasis, 
+    user, loading, syncError, skpds, anggarans, realisasis, quotaExceeded,
     login, logout, setSyncError,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
@@ -164,22 +164,37 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {syncError && (
-          <div className="bg-red-50 border-b border-red-200 px-10 py-3 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-300">
+          <div className={cn(
+            "border-b px-10 py-3 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-300",
+            quotaExceeded ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
+          )}>
             <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <p className="text-sm font-bold text-red-700">{syncError}</p>
+              <div className={cn(
+                "w-2 h-2 rounded-full animate-pulse",
+                quotaExceeded ? "bg-amber-500" : "bg-red-500"
+              )}></div>
+              <p className={cn(
+                "text-sm font-bold",
+                quotaExceeded ? "text-amber-700" : "text-red-700"
+              )}>{syncError}</p>
             </div>
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setSyncError(null)}
-                className="p-1.5 text-red-400 hover:text-red-700 transition-colors"
+                className={cn(
+                  "p-1.5 transition-colors",
+                  quotaExceeded ? "text-amber-400 hover:text-amber-700" : "text-red-400 hover:text-red-700"
+                )}
                 title="Sembunyikan Pesan"
               >
                 <X className="w-4 h-4" />
               </button>
               <button 
                 onClick={() => window.location.reload()}
-                className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-all ml-2"
+                className={cn(
+                  "px-3 py-1 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ml-2",
+                  quotaExceeded ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"
+                )}
               >
                 Refresh Data
               </button>

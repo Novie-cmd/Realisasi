@@ -92,7 +92,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (e.message === 'QUOTA_EXCEEDED') {
         if (!quotaExceeded) {
           setQuotaExceeded(true);
-          setSyncError("Peringatan: Batas kuota harian database tercapai. Aplikasi beralih ke Mode Offline (Data tetap bisa dilihat/diedit dari memori browser).");
+          // Only show banner if we have absolutely no data yet
+          if (skpds.length === 0 && anggarans.length === 0) {
+            setSyncError("Peringatan: Kuota database hari ini habis. Aplikasi beralih ke Mode Offline (Menggunakan data cadangan).");
+          }
         }
         return;
       }
@@ -100,31 +103,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (!syncError) {
         try {
           const errorDetail = JSON.parse(e.message);
-          setSyncError(`Sinkronisasi Gagal: ${errorDetail.error}. Pastikan akun ${user?.email} memiliki akses.`);
+          setSyncError(`Sinkronisasi Gagal: ${errorDetail.error}`);
         } catch {
-          setSyncError(`Masalah Koneksi: ${err.code || 'Error'}. Silakan periksa koneksi internet Anda.`);
+          setSyncError(`Koneksi Bermasalah: ${err.code || 'Error'}`);
         }
       }
     }
   };
 
-  const verifyConnection = async () => {
-    try {
-      await getDocFromServer(doc(db, 'test', 'connection'));
-      console.log("Firebase connection verified");
-    } catch (error: any) {
-      if (error?.code === 'resource-exhausted') {
-        handleAsyncError(error);
-      } else if (error instanceof Error && error.message.includes('the client is offline')) {
-        setSyncError("Perangkat Anda sedang offline. Hubungkan ke internet untuk melakukan sinkronisasi.");
-      } else {
-        console.error("Connection test failed:", error);
-      }
-    }
-  };
-
   useEffect(() => {
-    verifyConnection();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
@@ -135,7 +122,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           email: u.email,
           name: u.displayName,
           lastLogin: new Date().toISOString()
-        }, { merge: true });
+        }, { merge: true }).catch(err => {
+          if (err.code === 'resource-exhausted') {
+             setQuotaExceeded(true);
+          }
+        });
       }
     });
 

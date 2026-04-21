@@ -81,15 +81,15 @@ export default function Dashboard() {
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="bg-red-50 border border-red-200 rounded-2xl p-6 flex items-center gap-4 overflow-hidden"
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-center gap-4 overflow-hidden shadow-sm"
         >
-          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-6 h-6 text-red-600" />
+          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-6 h-6 text-amber-600" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-red-900 leading-none mb-1">Akses Database Terbatas (Limit Tercapai)</h4>
-            <p className="text-xs text-red-700 font-medium opacity-80">
-              Sistem telah mencapai batas pembacaan harian Google. Dashboard ini mungkin menampilkan data dari cache lokal Anda (tidak real-time).
+            <h4 className="text-sm font-bold text-amber-900 leading-none mb-1 uppercase tracking-wider">Mode Dokumentasi (Offline)</h4>
+            <p className="text-xs text-amber-700 font-medium leading-relaxed">
+              Batas kuota database tercapai. Sistem beralih menggunakan data cadangan lokal. Anda tetap dapat melakukan input, dan data akan sinkron otomatis saat kuota tersedia kembali (besok).
             </p>
           </div>
         </motion.div>

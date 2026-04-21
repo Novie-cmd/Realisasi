@@ -73,14 +73,4 @@ export const handleFirestoreError = (error: any, operationType: FirestoreErrorIn
   throw error;
 };
 
-// CRITICAL: Connection test
-export async function testFirestoreConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firebase connection verified");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration or internet connection.");
-    }
-  }
-}
+// Cleanup old functions
