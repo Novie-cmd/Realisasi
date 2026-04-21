@@ -170,13 +170,16 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, [realisasis, isSyncing]);
 
   const handleAsyncError = (err: any) => {
+    setIsSyncing(false);
+    setSyncProgress(0);
+    
     try {
       handleFirestoreError(err, 'list');
     } catch (e: any) {
       if (e.message === 'QUOTA_EXCEEDED') {
         if (!quotaExceeded) {
           setQuotaExceeded(true);
-          setSyncError("Peringatan: Kuota database hari ini habis. Aplikasi beralih ke Mode Offline (Menggunakan data cadangan).");
+          setSyncError("Peringatan: Kuota database hari ini habis (Firestore free unit exceeded). Aplikasi beralih ke Mode Offline. Data tetap tersimpan aman di browser Anda.");
         }
         return;
       }
@@ -186,7 +189,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           const errorDetail = JSON.parse(e.message);
           setSyncError(`Sinkronisasi Gagal: ${errorDetail.error}`);
         } catch {
-          setSyncError(`Koneksi Bermasalah: ${err.code || 'Error'}`);
+          setSyncError(`Koneksi Bermasalah: ${err.message || err.code || 'Error'}`);
         }
       }
     }
