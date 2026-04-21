@@ -108,6 +108,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [dbReady, setDbReady] = useState(false);
+  const quotaRef = React.useRef(quotaExceeded);
+
+  // Sync ref with state
+  useEffect(() => {
+    quotaRef.current = quotaExceeded;
+  }, [quotaExceeded]);
 
   // Prevent accidental close/refresh during sync
   useEffect(() => {
@@ -234,7 +240,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       setLoading(false);
       
-      if (u && !quotaExceeded) {
+      if (u && !quotaRef.current) {
         // Only update profile if we haven't hit quota
         // and only periodically (using session storage to track)
         const lastSync = sessionStorage.getItem(`user_sync_${u.uid}`);
@@ -248,7 +254,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           }, { merge: true }).then(() => {
             sessionStorage.setItem(`user_sync_${u.uid}`, now.toString());
           }).catch(err => {
-            if (err.code === 'resource-exhausted') {
+            if (err.code === 'resource-exhausted' || err.message?.includes('quota')) {
                setQuotaExceeded(true);
             }
           });
@@ -393,8 +399,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
-        // Redundant check in loop
-        if (localStorage.getItem('quota_exceeded') === 'true') break;
+        // Check ref inside loop to stop immediately
+        if (quotaRef.current) break;
 
         const chunk = chunks[i];
         const batch = writeBatch(db);
@@ -458,6 +464,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
+        if (quotaRef.current) break;
+
         const chunk = chunks[i];
         const batch = writeBatch(db);
         chunk.forEach(item => {
@@ -526,7 +534,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
-        if (localStorage.getItem('quota_exceeded') === 'true') break;
+        if (quotaRef.current) break;
 
         const chunk = chunks[i];
         const batch = writeBatch(db);
@@ -587,6 +595,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
+        if (quotaRef.current) break;
         const chunk = chunks[i];
         const batch = writeBatch(db);
         chunk.forEach(item => {
@@ -656,7 +665,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     try {
       for (let i = 0; i < chunks.length; i++) {
-        if (localStorage.getItem('quota_exceeded') === 'true') break;
+        if (quotaRef.current) break;
 
         const chunk = chunks[i];
         const batch = writeBatch(db);
@@ -765,6 +774,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         const chunks = [];
         for (let i = 0; i < rlCopy.length; i += batchSize) chunks.push(rlCopy.slice(i, i + batchSize));
         for (let i = 0; i < chunks.length; i++) {
+          if (quotaRef.current) break;
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'realisasis', item.id)));
           await batch.commit();
@@ -779,6 +789,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         const chunks = [];
         for (let i = 0; i < agCopy.length; i += batchSize) chunks.push(agCopy.slice(i, i + batchSize));
         for (let i = 0; i < chunks.length; i++) {
+          if (quotaRef.current) break;
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'anggarans', item.id)));
           await batch.commit();
@@ -793,6 +804,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         const chunks = [];
         for (let i = 0; i < skCopy.length; i += batchSize) chunks.push(skCopy.slice(i, i + batchSize));
         for (let i = 0; i < chunks.length; i++) {
+          if (quotaRef.current) break;
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'skpds', item.id)));
           await batch.commit();
