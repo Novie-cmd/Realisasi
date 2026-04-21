@@ -55,7 +55,33 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [realisasis, setRealisasis] = useState<Realisasi[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState({ skpds: true, anggarans: true, realisasis: true });
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState(() => {
+    try {
+      const stored = localStorage.getItem('quota_exceeded');
+      if (stored) {
+        const { exceeded, timestamp } = JSON.parse(stored);
+        // Reset after 24 hours
+        if (exceeded && Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load quota status:", e);
+    }
+    return false;
+  });
+
+  // Persist quota status
+  useEffect(() => {
+    if (quotaExceeded) {
+      localStorage.setItem('quota_exceeded', JSON.stringify({
+        exceeded: true,
+        timestamp: Date.now()
+      }));
+    } else {
+      localStorage.removeItem('quota_exceeded');
+    }
+  }, [quotaExceeded]);
 
   // Load backups on mount
   useEffect(() => {
@@ -116,29 +142,39 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       setLoading(false);
       
-      if (u) {
-        // Create/Update user profile
-        setDoc(doc(db, 'users', u.uid), {
-          email: u.email,
-          name: u.displayName,
-          lastLogin: new Date().toISOString()
-        }, { merge: true }).catch(err => {
-          if (err.code === 'resource-exhausted') {
-             setQuotaExceeded(true);
-          }
-        });
+      if (u && !quotaExceeded) {
+        // Only update profile if we haven't hit quota
+        // and only periodically (using session storage to track)
+        const lastSync = sessionStorage.getItem(`user_sync_${u.uid}`);
+        const now = Date.now();
+        
+        if (!lastSync || (now - parseInt(lastSync)) > 3600000) { // 1 hour
+          setDoc(doc(db, 'users', u.uid), {
+            email: u.email,
+            name: u.displayName,
+            lastLogin: new Date().toISOString()
+          }, { merge: true }).then(() => {
+            sessionStorage.setItem(`user_sync_${u.uid}`, now.toString());
+          }).catch(err => {
+            if (err.code === 'resource-exhausted') {
+               setQuotaExceeded(true);
+            }
+          });
+        }
       }
     });
 
     return unsubscribe;
-  }, []);
+  }, [quotaExceeded]);
 
   // Real-time listeners
   useEffect(() => {
-    if (!user) {
-      setSkpds([]);
-      setAnggarans([]);
-      setRealisasis([]);
+    if (!user || quotaExceeded) {
+      if (!user) {
+        setSkpds([]);
+        setAnggarans([]);
+        setRealisasis([]);
+      }
       return;
     }
 
@@ -159,8 +195,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
-      console.error("SKPD Sync Error:", err.code, err.message);
-      handleAsyncError(err);
+      if (err.code === 'resource-exhausted') {
+        handleAsyncError(err);
+      } else {
+        console.error("SKPD Sync Error:", err.code, err.message);
+        handleAsyncError(err);
+      }
       setDataLoading(prev => ({ ...prev, skpds: false }));
     });
 
@@ -181,8 +221,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
-      console.error("Anggaran Sync Error:", err.code, err.message);
-      handleAsyncError(err);
+      if (err.code === 'resource-exhausted') {
+        handleAsyncError(err);
+      } else {
+        console.error("Anggaran Sync Error:", err.code, err.message);
+        handleAsyncError(err);
+      }
       setDataLoading(prev => ({ ...prev, anggarans: false }));
     });
 
@@ -207,8 +251,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
-      console.error("Realisasi Sync Error:", err.code, err.message);
-      handleAsyncError(err);
+      if (err.code === 'resource-exhausted') {
+        handleAsyncError(err);
+      } else {
+        console.error("Realisasi Sync Error:", err.code, err.message);
+        handleAsyncError(err);
+      }
       setDataLoading(prev => ({ ...prev, realisasis: false }));
     });
 
@@ -217,7 +265,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       unsubAnggaran();
       unsubRealisasi();
     };
-  }, [user]);
+  }, [user, quotaExceeded]);
 
   const login = async () => {
     try {
@@ -230,15 +278,37 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const logout = () => signOut(auth);
 
   const saveSKPD = async (data: SKPD) => {
+    // Optimistic local update
+    setSkpds(prev => {
+      const filtered = prev.filter(i => i.id !== data.id);
+      return [...filtered, data];
+    });
+
+    if (quotaExceeded) return;
+
     try {
       await setDoc(doc(db, 'skpds', data.id), data);
     } catch (err) { 
       handleAsyncError(err);
-      handleFirestoreError(err, 'create', `skpds/${data.id}`); 
+      // Don't re-throw 'QUOTA_EXCEEDED' as fatal, we handled it optimistically
+      try {
+        handleFirestoreError(err, 'create', `skpds/${data.id}`);
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
     }
   };
 
   const saveSKPDsBulk = async (data: SKPD[]) => {
+    // Optimistic local update
+    setSkpds(prev => {
+      const map = new Map<string, SKPD>(prev.map(i => [i.id, i]));
+      data.forEach(item => map.set(item.id, item));
+      return Array.from(map.values());
+    });
+
+    if (quotaExceeded) return;
+
     const chunks = [];
     for (let i = 0; i < data.length; i += 500) {
       chunks.push(data.slice(i, i + 500));
@@ -253,24 +323,44 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         await batch.commit();
       } catch (err) {
         handleAsyncError(err);
-        handleFirestoreError(err, 'write', 'skpds/bulk');
+        try {
+          handleFirestoreError(err, 'write', 'skpds/bulk');
+        } catch (e: any) {
+          if (e.message === 'QUOTA_EXCEEDED') break; // Stop trying if quota hit
+          throw e;
+        }
       }
     }
   };
 
   const deleteSKPD = async (id: string) => {
+    // Optimistic local delete
+    setSkpds(prev => prev.filter(i => i.id !== id));
+
+    if (quotaExceeded) return;
+
     try {
       await deleteDoc(doc(db, 'skpds', id));
     } catch (err) { 
       handleAsyncError(err);
-      handleFirestoreError(err, 'delete', `skpds/${id}`); 
+      try {
+        handleFirestoreError(err, 'delete', `skpds/${id}`);
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
     }
   };
 
   const deleteAllSKPDs = async () => {
+    const listToDelete = [...skpds];
+    // Optimistic local clear
+    setSkpds([]);
+
+    if (quotaExceeded) return;
+
     const chunks = [];
-    for (let i = 0; i < skpds.length; i += 500) {
-      chunks.push(skpds.slice(i, i + 500));
+    for (let i = 0; i < listToDelete.length; i += 500) {
+      chunks.push(listToDelete.slice(i, i + 500));
     }
 
     for (const chunk of chunks) {
@@ -282,21 +372,47 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         await batch.commit();
       } catch (err) {
         handleAsyncError(err);
-        handleFirestoreError(err, 'delete', 'skpds/bulk');
+        try {
+          handleFirestoreError(err, 'delete', 'skpds/bulk');
+        } catch (e: any) {
+          if (e.message === 'QUOTA_EXCEEDED') break;
+          throw e;
+        }
       }
     }
   };
 
   const saveAnggaran = async (data: Anggaran) => {
+    // Optimistic local update
+    setAnggarans(prev => {
+      const filtered = prev.filter(i => i.id !== data.id);
+      return [...filtered, data];
+    });
+
+    if (quotaExceeded) return;
+
     try {
       await setDoc(doc(db, 'anggarans', data.id), data);
     } catch (err) { 
       handleAsyncError(err);
-      handleFirestoreError(err, 'create', `anggarans/${data.id}`); 
+      try {
+        handleFirestoreError(err, 'create', `anggarans/${data.id}`);
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
     }
   };
 
   const saveAnggaransBulk = async (data: Anggaran[]) => {
+    // Optimistic local update
+    setAnggarans(prev => {
+      const map = new Map<string, Anggaran>(prev.map(i => [i.id, i]));
+      data.forEach(item => map.set(item.id, item));
+      return Array.from(map.values());
+    });
+
+    if (quotaExceeded) return;
+
     // Firestore batches are limited to 500 ops
     const chunks = [];
     for (let i = 0; i < data.length; i += 500) {
@@ -312,24 +428,44 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         await batch.commit();
       } catch (err) {
         handleAsyncError(err);
-        handleFirestoreError(err, 'write', 'anggarans/bulk');
+        try {
+          handleFirestoreError(err, 'write', 'anggarans/bulk');
+        } catch (e: any) {
+          if (e.message === 'QUOTA_EXCEEDED') break;
+          throw e;
+        }
       }
     }
   };
 
   const deleteAnggaran = async (id: string) => {
+    // Optimistic local delete
+    setAnggarans(prev => prev.filter(i => i.id !== id));
+
+    if (quotaExceeded) return;
+
     try {
       await deleteDoc(doc(db, 'anggarans', id));
     } catch (err) { 
       handleAsyncError(err);
-      handleFirestoreError(err, 'delete', `anggarans/${id}`); 
+      try {
+        handleFirestoreError(err, 'delete', `anggarans/${id}`);
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
     }
   };
 
   const deleteAllAnggarans = async () => {
+    const listToDelete = [...anggarans];
+    // Optimistic local clear
+    setAnggarans([]);
+
+    if (quotaExceeded) return;
+
     const chunks = [];
-    for (let i = 0; i < anggarans.length; i += 500) {
-      chunks.push(anggarans.slice(i, i + 500));
+    for (let i = 0; i < listToDelete.length; i += 500) {
+      chunks.push(listToDelete.slice(i, i + 500));
     }
 
     for (const chunk of chunks) {
@@ -341,21 +477,48 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         await batch.commit();
       } catch (err) {
         handleAsyncError(err);
-        handleFirestoreError(err, 'delete', 'anggarans/bulk');
+        try {
+          handleFirestoreError(err, 'delete', 'anggarans/bulk');
+        } catch (e: any) {
+          if (e.message === 'QUOTA_EXCEEDED') break;
+          throw e;
+        }
       }
     }
   };
 
   const saveRealisasi = async (data: Realisasi) => {
+    // Optimistic local update
+    setRealisasis(prev => {
+      const filtered = prev.filter(i => i.id !== data.id);
+      const updated = [...filtered, data];
+      return updated.sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+    });
+
+    if (quotaExceeded) return;
+
     try {
       await setDoc(doc(db, 'realisasis', data.id), data);
     } catch (err) { 
       handleAsyncError(err);
-      handleFirestoreError(err, 'create', `realisasis/${data.id}`); 
+      try {
+        handleFirestoreError(err, 'create', `realisasis/${data.id}`);
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
     }
   };
 
   const saveRealisasisBulk = async (data: Realisasi[]) => {
+    // Optimistic local update
+    setRealisasis(prev => {
+      const map = new Map<string, Realisasi>(prev.map(i => [i.id, i]));
+      data.forEach(item => map.set(item.id, item));
+      return Array.from(map.values()).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+    });
+
+    if (quotaExceeded) return;
+
     const chunks = [];
     for (let i = 0; i < data.length; i += 500) {
       chunks.push(data.slice(i, i + 500));
@@ -370,24 +533,44 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         await batch.commit();
       } catch (err) {
         handleAsyncError(err);
-        handleFirestoreError(err, 'write', 'realisasis/bulk');
+        try {
+          handleFirestoreError(err, 'write', 'realisasis/bulk');
+        } catch (e: any) {
+          if (e.message === 'QUOTA_EXCEEDED') break;
+          throw e;
+        }
       }
     }
   };
 
   const deleteRealisasi = async (id: string) => {
+    // Optimistic local delete
+    setRealisasis(prev => prev.filter(i => i.id !== id));
+
+    if (quotaExceeded) return;
+
     try {
       await deleteDoc(doc(db, 'realisasis', id));
     } catch (err) { 
       handleAsyncError(err);
-      handleFirestoreError(err, 'delete', `realisasis/${id}`); 
+      try {
+        handleFirestoreError(err, 'delete', `realisasis/${id}`);
+      } catch (e: any) {
+        if (e.message !== 'QUOTA_EXCEEDED') throw e;
+      }
     }
   };
 
   const deleteAllRealisasi = async () => {
+    const listToDelete = [...realisasis];
+    // Optimistic local clear
+    setRealisasis([]);
+
+    if (quotaExceeded) return;
+
     const chunks = [];
-    for (let i = 0; i < realisasis.length; i += 500) {
-      chunks.push(realisasis.slice(i, i + 500));
+    for (let i = 0; i < listToDelete.length; i += 500) {
+      chunks.push(listToDelete.slice(i, i + 500));
     }
 
     for (const chunk of chunks) {
@@ -399,7 +582,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         await batch.commit();
       } catch (err) {
         handleAsyncError(err);
-        handleFirestoreError(err, 'delete', 'realisasis/bulk');
+        try {
+          handleFirestoreError(err, 'delete', 'realisasis/bulk');
+        } catch (e: any) {
+          if (e.message === 'QUOTA_EXCEEDED') break;
+          throw e;
+        }
       }
     }
   };
