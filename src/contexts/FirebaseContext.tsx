@@ -226,16 +226,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setAnggarans([]);
         setRealisasis([]);
       }
+      // If we're not syncing with cloud, mark as loaded immediately to stop spinners
+      setDataLoading({ skpds: false, anggarans: false, realisasis: false });
       return;
     }
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
+      setDataLoading(prev => ({ ...prev, skpds: false }));
+      
       // Don't overwrite local state if we have pending writes (e.g. bulk import in progress)
       if (snapshot.metadata.hasPendingWrites) return;
       
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SKPD));
       setSkpds(data);
-      setDataLoading(prev => ({ ...prev, skpds: false }));
     }, (err) => {
       if (err.code === 'resource-exhausted') {
         handleAsyncError(err);
@@ -247,12 +250,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
+      setDataLoading(prev => ({ ...prev, anggarans: false }));
+
       // Don't overwrite local state if we have pending writes
       if (snapshot.metadata.hasPendingWrites) return;
 
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Anggaran));
       setAnggarans(data);
-      setDataLoading(prev => ({ ...prev, anggarans: false }));
     }, (err) => {
       if (err.code === 'resource-exhausted') {
         handleAsyncError(err);
@@ -264,12 +268,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     });
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
+      setDataLoading(prev => ({ ...prev, realisasis: false }));
+
       // Don't overwrite local state if we have pending writes
       if (snapshot.metadata.hasPendingWrites) return;
 
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Realisasi));
       setRealisasis(data);
-      setDataLoading(prev => ({ ...prev, realisasis: false }));
     }, (err) => {
       if (err.code === 'resource-exhausted') {
         handleAsyncError(err);
