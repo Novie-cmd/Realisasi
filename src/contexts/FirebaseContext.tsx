@@ -119,10 +119,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       if (e.message === 'QUOTA_EXCEEDED') {
         if (!quotaExceeded) {
           setQuotaExceeded(true);
-          // Only show banner if we have absolutely no data yet
-          if (skpds.length === 0 && anggarans.length === 0) {
-            setSyncError("Peringatan: Kuota database hari ini habis. Aplikasi beralih ke Mode Offline (Menggunakan data cadangan).");
-          }
+          setSyncError("Peringatan: Kuota database hari ini habis. Aplikasi beralih ke Mode Offline (Menggunakan data cadangan).");
         }
         return;
       }

@@ -17,7 +17,8 @@ import {
   TrendingUp, 
   Wallet, 
   AlertCircle,
-  Database
+  Database,
+  RefreshCw
 } from 'lucide-react';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 import { formatIDR, formatPercent, cn } from '../lib/utils';
@@ -27,7 +28,7 @@ import { useFirebase } from '../contexts/FirebaseContext';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function Dashboard() {
-  const { skpds, anggarans, realisasis, quotaExceeded } = useFirebase();
+  const { skpds, anggarans, realisasis, quotaExceeded, resetQuotaStatus } = useFirebase();
   const stats = useMemo(() => {
     const totalAnggaran = anggarans.reduce((sum, item) => sum + (Number(item.pagu) || 0), 0);
     const totalRealisasi = realisasis.reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
@@ -81,17 +82,24 @@ export default function Dashboard() {
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-center gap-4 overflow-hidden shadow-sm"
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 overflow-hidden shadow-sm"
         >
           <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
             <AlertCircle className="w-6 h-6 text-amber-600" />
           </div>
-          <div>
-            <h4 className="text-sm font-bold text-amber-900 leading-none mb-1 uppercase tracking-wider">Mode Dokumentasi (Offline)</h4>
-            <p className="text-xs text-amber-700 font-medium leading-relaxed">
-              Batas kuota database tercapai. Sistem beralih menggunakan data cadangan lokal. Anda tetap dapat melakukan input, dan data akan sinkron otomatis saat kuota tersedia kembali (besok).
+          <div className="flex-1">
+            <h4 className="text-sm font-bold text-amber-900 leading-none mb-2 uppercase tracking-wider">Mode Dokumentasi (Offline)</h4>
+            <p className="text-xs text-amber-700 font-medium leading-relaxed max-w-2xl">
+              Batas kuota database tercapai. Sistem beralih menggunakan data cadangan lokal. Anda tetap dapat melakukan input, dan data akan sinkron otomatis saat kuota tersedia kembali.
             </p>
           </div>
+          <button
+            onClick={() => resetQuotaStatus()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-amber-700 transition-all shadow-md active:scale-95 flex-shrink-0"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Hubungkan Sekarang
+          </button>
         </motion.div>
       )}
 
