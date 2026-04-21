@@ -51,11 +51,40 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [skpds, setSkpds] = useState<SKPD[]>([]);
-  const [anggarans, setAnggarans] = useState<Anggaran[]>([]);
-  const [realisasis, setRealisasis] = useState<Realisasi[]>([]);
+  const [skpds, setSkpds] = useState<SKPD[]>(() => {
+    try {
+      const cached = localStorage.getItem('backup_skpds');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      }
+    } catch {}
+    return [];
+  });
+  const [anggarans, setAnggarans] = useState<Anggaran[]>(() => {
+    try {
+      const cached = localStorage.getItem('backup_anggarans');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      }
+    } catch {}
+    return [];
+  });
+  const [realisasis, setRealisasis] = useState<Realisasi[]>(() => {
+    try {
+      const cached = localStorage.getItem('backup_realisasis');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      }
+    } catch {}
+    return [];
+  });
+  
   const [syncError, setSyncError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState({ skpds: true, anggarans: true, realisasis: true });
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(() => {
     try {
       const stored = localStorage.getItem('quota_exceeded');
@@ -84,31 +113,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   }, [quotaExceeded]);
 
-  // Load backups on mount
-  useEffect(() => {
-    try {
-      const cachedSkpds = localStorage.getItem('backup_skpds');
-      const cachedAnggarans = localStorage.getItem('backup_anggarans');
-      const cachedRealisasis = localStorage.getItem('backup_realisasis');
-      
-      if (cachedSkpds) {
-        const parsed = JSON.parse(cachedSkpds);
-        if (Array.isArray(parsed)) setSkpds(parsed.filter(Boolean));
-      }
-      if (cachedAnggarans) {
-        const parsed = JSON.parse(cachedAnggarans);
-        if (Array.isArray(parsed)) setAnggarans(parsed.filter(Boolean));
-      }
-      if (cachedRealisasis) {
-        const parsed = JSON.parse(cachedRealisasis);
-        if (Array.isArray(parsed)) setRealisasis(parsed.filter(Boolean));
-      }
-    } catch (e) {
-      console.warn("Failed to load local backup:", e);
-    }
-  }, []);
-
-  // Save backups on change (including empty states) with simple debounce to prevent lag
+  // Save backups on change (including empty states) with shorter debounce for better persistence
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -116,7 +121,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("Storage error for SKPD:", e);
       }
-    }, 2000);
+    }, 500);
     return () => clearTimeout(timer);
   }, [skpds]);
 
@@ -127,7 +132,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("Storage error for Anggaran:", e);
       }
-    }, 2000);
+    }, 500);
     return () => clearTimeout(timer);
   }, [anggarans]);
 
@@ -138,7 +143,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("Storage error for Realisasi:", e);
       }
-    }, 2000);
+    }, 500);
     return () => clearTimeout(timer);
   }, [realisasis]);
 
@@ -207,9 +212,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubSkpd = onSnapshot(collection(db, 'skpds'), (snapshot) => {
-      // If snapshot is empty and we had data, we should clear it (unless quota hit)
+      // Logic Pencegahan: Jika data di server kosong tetapi kita punya data lokal (backup),
+      // jangan langsung hapus. Biarkan data lokal tetap ada kecuali pengguna sengaja menghapus.
       if (snapshot.empty) {
-        setSkpds([]);
+        setSkpds(prev => (prev.length > 0 ? prev : []));
         setDataLoading(prev => ({ ...prev, skpds: false }));
         return;
       }
@@ -241,7 +247,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubAnggaran = onSnapshot(collection(db, 'anggarans'), (snapshot) => {
       if (snapshot.empty) {
-        setAnggarans([]);
+        setAnggarans(prev => (prev.length > 0 ? prev : []));
         setDataLoading(prev => ({ ...prev, anggarans: false }));
         return;
       }
@@ -273,7 +279,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     const unsubRealisasi = onSnapshot(query(collection(db, 'realisasis'), orderBy('tanggal', 'desc')), (snapshot) => {
       if (snapshot.empty) {
-        setRealisasis([]);
+        setRealisasis(prev => (prev.length > 0 ? prev : []));
         setDataLoading(prev => ({ ...prev, realisasis: false }));
         return;
       }
