@@ -268,7 +268,7 @@ export default function MasterData() {
                 setIsSaving(false);
               }
             }}
-            disabled={isSaving || quotaExceeded || (tab === 'skpd' ? skpds.length === 0 : anggarans.length === 0)}
+            disabled={isSaving || (tab === 'skpd' ? skpds.length === 0 : anggarans.length === 0)}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" />
@@ -287,7 +287,7 @@ export default function MasterData() {
           </div>
           <label className={cn(
             "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm",
-            (isSaving || quotaExceeded) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
+            (isSaving) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-bento-accent text-white hover:bg-slate-800 cursor-pointer"
           )}>
             {isSaving ? (
               <>
@@ -304,7 +304,7 @@ export default function MasterData() {
               type="file" 
               accept=".xlsx,.xls" 
               className="hidden" 
-              disabled={isSaving || quotaExceeded}
+              disabled={isSaving}
               onChange={tab === 'skpd' ? handleImportSKPD : handleImportAnggaran}
             />
           </label>
