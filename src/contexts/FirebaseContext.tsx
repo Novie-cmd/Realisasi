@@ -332,14 +332,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       return Array.from(map.values());
     });
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+      setSyncError("Peringatan: Kuota database habis. Data hanya disimpan secara lokal.");
+      return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2); // Start with a small boost for UX
 
+    const batchSize = 100; // Smaller size for more frequent UI updates
     const chunks = [];
-    for (let i = 0; i < data.length; i += 500) {
-      chunks.push(data.slice(i, i + 500));
+    for (let i = 0; i < data.length; i += batchSize) {
+      chunks.push(data.slice(i, i + batchSize));
     }
 
     try {
@@ -351,7 +355,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
       }
     } catch (err) {
       handleAsyncError(err);
@@ -384,14 +388,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Optimistic local clear
     setSkpds([]);
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+      setSyncError("Peringatan: Kuota database habis. Penghapusan di server ditunda.");
+      return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2);
 
+    const batchSize = 100;
     const chunks = [];
-    for (let i = 0; i < listToDelete.length; i += 500) {
-      chunks.push(listToDelete.slice(i, i + 500));
+    for (let i = 0; i < listToDelete.length; i += batchSize) {
+      chunks.push(listToDelete.slice(i, i + batchSize));
     }
 
     try {
@@ -402,15 +410,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'skpds', item.id));
         });
         await batch.commit();
-        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
       }
     } catch (err) {
       handleAsyncError(err);
-      try {
-        handleFirestoreError(err, 'delete', 'skpds/bulk');
-      } catch (e: any) {
-        if (e.message !== 'QUOTA_EXCEEDED') throw e;
-      }
     } finally {
       setIsSyncing(false);
       setSyncProgress(100);
@@ -446,15 +449,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       return Array.from(map.values());
     });
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+       setSyncError("Peringatan: Kuota database habis. Data hanya disimpan secara lokal.");
+       return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2);
 
-    // Firestore batches are limited to 500 ops
+    const batchSize = 100;
     const chunks = [];
-    for (let i = 0; i < data.length; i += 500) {
-      chunks.push(data.slice(i, i + 500));
+    for (let i = 0; i < data.length; i += batchSize) {
+      chunks.push(data.slice(i, i + batchSize));
     }
 
     try {
@@ -466,7 +472,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
       }
     } catch (err) {
       handleAsyncError(err);
@@ -499,14 +505,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Optimistic local clear
     setAnggarans([]);
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+       setSyncError("Peringatan: Kuota database habis. Penghapusan di server ditunda.");
+       return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2);
 
+    const batchSize = 100;
     const chunks = [];
-    for (let i = 0; i < listToDelete.length; i += 500) {
-      chunks.push(listToDelete.slice(i, i + 500));
+    for (let i = 0; i < listToDelete.length; i += batchSize) {
+      chunks.push(listToDelete.slice(i, i + batchSize));
     }
 
     try {
@@ -517,15 +527,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'anggarans', item.id));
         });
         await batch.commit();
-        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
       }
     } catch (err) {
       handleAsyncError(err);
-      try {
-        handleFirestoreError(err, 'delete', 'anggarans/bulk');
-      } catch (e: any) {
-        if (e.message !== 'QUOTA_EXCEEDED') throw e;
-      }
     } finally {
       setIsSyncing(false);
       setSyncProgress(100);
@@ -562,14 +567,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       return Array.from(map.values()).sort((a, b) => (b?.tanggal || '').localeCompare(a?.tanggal || ''));
     });
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+       setSyncError("Peringatan: Kuota database habis. Data hanya disimpan secara lokal.");
+       return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2);
 
+    const batchSize = 100;
     const chunks = [];
-    for (let i = 0; i < data.length; i += 500) {
-      chunks.push(data.slice(i, i + 500));
+    for (let i = 0; i < data.length; i += batchSize) {
+      chunks.push(data.slice(i, i + batchSize));
     }
 
     try {
@@ -581,7 +590,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
       }
     } catch (err) {
       handleAsyncError(err);
@@ -614,14 +623,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     // Optimistic local clear
     setRealisasis([]);
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+       setSyncError("Peringatan: Kuota database habis. Penghapusan di server ditunda.");
+       return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2);
 
+    const batchSize = 100;
     const chunks = [];
-    for (let i = 0; i < listToDelete.length; i += 500) {
-      chunks.push(listToDelete.slice(i, i + 500));
+    for (let i = 0; i < listToDelete.length; i += batchSize) {
+      chunks.push(listToDelete.slice(i, i + batchSize));
     }
 
     try {
@@ -632,7 +645,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'realisasis', item.id));
         });
         await batch.commit();
-        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
       }
     } catch (err) {
       handleAsyncError(err);
@@ -653,10 +666,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('backup_anggarans');
     localStorage.removeItem('backup_realisasis');
 
-    if (quotaExceeded) return;
+    if (quotaExceeded) {
+      setSyncError("Peringatan: Kuota database habis. Penghapusan di server ditunda.");
+      return;
+    }
 
     setIsSyncing(true);
-    setSyncProgress(0);
+    setSyncProgress(2);
+
+    const batchSize = 100;
 
     try {
       // 2. Perform deletions in Firestore sequentially to handle progress
@@ -664,12 +682,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const rlCopy = [...realisasis];
       if (rlCopy.length > 0) {
         const chunks = [];
-        for (let i = 0; i < rlCopy.length; i += 500) chunks.push(rlCopy.slice(i, i + 500));
+        for (let i = 0; i < rlCopy.length; i += batchSize) chunks.push(rlCopy.slice(i, i + batchSize));
         for (let i = 0; i < chunks.length; i++) {
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'realisasis', item.id)));
           await batch.commit();
-          setSyncProgress(Math.round(((i + 1) / chunks.length) * 33)); // First 33%
+          setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 33))); // First 33%
         }
       }
 
@@ -677,12 +695,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const agCopy = [...anggarans];
       if (agCopy.length > 0) {
         const chunks = [];
-        for (let i = 0; i < agCopy.length; i += 500) chunks.push(agCopy.slice(i, i + 500));
+        for (let i = 0; i < agCopy.length; i += batchSize) chunks.push(agCopy.slice(i, i + batchSize));
         for (let i = 0; i < chunks.length; i++) {
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'anggarans', item.id)));
           await batch.commit();
-          setSyncProgress(33 + Math.round(((i + 1) / chunks.length) * 33)); // Up to 66%
+          setSyncProgress(Math.max(2, 33 + Math.round(((i + 1) / chunks.length) * 33))); // Up to 66%
         }
       }
 
@@ -690,12 +708,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const skCopy = [...skpds];
       if (skCopy.length > 0) {
         const chunks = [];
-        for (let i = 0; i < skCopy.length; i += 500) chunks.push(skCopy.slice(i, i + 500));
+        for (let i = 0; i < skCopy.length; i += batchSize) chunks.push(skCopy.slice(i, i + batchSize));
         for (let i = 0; i < chunks.length; i++) {
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'skpds', item.id)));
           await batch.commit();
-          setSyncProgress(66 + Math.round(((i + 1) / chunks.length) * 34)); // Up to 100%
+          setSyncProgress(Math.max(2, 66 + Math.round(((i + 1) / chunks.length) * 34))); // Up to 100%
         }
       }
     } catch (err) {
