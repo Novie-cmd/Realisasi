@@ -42,6 +42,7 @@ interface FirebaseContextType {
   deleteAllRealisasi: () => Promise<void>;
   deleteAllSKPDs: () => Promise<void>;
   deleteAllAnggarans: () => Promise<void>;
+  setSyncError: (error: string | null) => void;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -56,22 +57,53 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [dataLoading, setDataLoading] = useState({ skpds: true, anggarans: true, realisasis: true });
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
+  // Load backups on mount
+  useEffect(() => {
+    try {
+      const cachedSkpds = localStorage.getItem('backup_skpds');
+      const cachedAnggarans = localStorage.getItem('backup_anggarans');
+      const cachedRealisasis = localStorage.getItem('backup_realisasis');
+      
+      if (cachedSkpds) setSkpds(JSON.parse(cachedSkpds));
+      if (cachedAnggarans) setAnggarans(JSON.parse(cachedAnggarans));
+      if (cachedRealisasis) setRealisasis(JSON.parse(cachedRealisasis));
+    } catch (e) {
+      console.warn("Failed to load local backup:", e);
+    }
+  }, []);
+
+  // Save backups on change
+  useEffect(() => {
+    if (skpds.length > 0) localStorage.setItem('backup_skpds', JSON.stringify(skpds));
+  }, [skpds]);
+
+  useEffect(() => {
+    if (anggarans.length > 0) localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
+  }, [anggarans]);
+
+  useEffect(() => {
+    if (realisasis.length > 0) localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
+  }, [realisasis]);
+
   const handleAsyncError = (err: any) => {
     try {
       handleFirestoreError(err, 'list');
     } catch (e: any) {
       if (e.message === 'QUOTA_EXCEEDED') {
-        setQuotaExceeded(true);
-        setSyncError("Kuota gratis database harian telah habis. Data tidak bisa disimpan/dihapus sampai besok pagi.");
+        if (!quotaExceeded) {
+          setQuotaExceeded(true);
+          setSyncError("Peringatan: Batas kuota harian database tercapai. Aplikasi beralih ke Mode Offline (Data tetap bisa dilihat/diedit dari memori browser).");
+        }
         return;
       }
       
-      try {
-        const errorDetail = JSON.parse(e.message);
-        setSyncError(`Terjadi kesalahan sinkronisasi (${errorDetail.error}). Periksa hak akses akun ${user?.email}.`);
-      } catch {
-        console.error("Async Operation Error:", err);
-        setSyncError(`Gagal sinkronisasi data: ${err.code || 'Error'} - ${err.message || 'Periksa koneksi atau hak akses'}.`);
+      if (!syncError) {
+        try {
+          const errorDetail = JSON.parse(e.message);
+          setSyncError(`Sinkronisasi Gagal: ${errorDetail.error}. Pastikan akun ${user?.email} memiliki akses.`);
+        } catch {
+          setSyncError(`Masalah Koneksi: ${err.code || 'Error'}. Silakan periksa koneksi internet Anda.`);
+        }
       }
     }
   };
@@ -387,7 +419,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       login, logout, 
       saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,
-      saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi
+      saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi,
+      setSyncError
     }}>
       {children}
     </FirebaseContext.Provider>

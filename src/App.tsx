@@ -32,7 +32,7 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 export default function App() {
   const { 
     user, loading, syncError, skpds, anggarans, realisasis, 
-    login, logout,
+    login, logout, setSyncError,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
     saveRealisasi, saveRealisasisBulk, deleteRealisasi
@@ -169,12 +169,21 @@ export default function App() {
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
               <p className="text-sm font-bold text-red-700">{syncError}</p>
             </div>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-all"
-            >
-              Muat Ulang
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setSyncError(null)}
+                className="p-1.5 text-red-400 hover:text-red-700 transition-colors"
+                title="Sembunyikan Pesan"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => window.location.reload()}
+                className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-all ml-2"
+              >
+                Refresh Data
+              </button>
+            </div>
           </div>
         )}
         <header className="h-20 flex items-center justify-between px-10 bg-transparent border-none sticky top-0 z-10">
