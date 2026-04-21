@@ -54,8 +54,8 @@ export default function Transactions() {
 
   const filteredRealisasi = realisasis.filter(r => {
     const anggaran = anggarans.find(a => a.id === r.anggaranId);
-    return r.keterangan.toLowerCase().includes(search.toLowerCase()) || 
-           anggaran?.namaAkun.toLowerCase().includes(search.toLowerCase());
+    return (r.keterangan || '').toLowerCase().includes(search.toLowerCase()) || 
+           (anggaran?.namaAkun || '').toLowerCase().includes(search.toLowerCase());
   });
 
   const handleImportRealisasi = (e: React.ChangeEvent<HTMLInputElement>) => {

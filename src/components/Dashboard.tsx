@@ -226,7 +226,7 @@ export default function Dashboard() {
               </Pie>
               <Tooltip 
                 formatter={(value: number) => formatIDR(value)}
-                contentStyle={{ borderRadius: '12px', shadow: 'none', border: '1px solid #e2e8f0' }}
+                contentStyle={{ borderRadius: '12px', boxShadow: 'none', border: '1px solid #e2e8f0' }}
               />
             </PieChart>
           </ResponsiveContainer>

@@ -26,36 +26,36 @@ export default function Reports() {
 
   const filteredSkpds = useMemo(() => {
     return skpds
-      .filter(s => s.nama.toLowerCase().includes(skpdSearch.toLowerCase()))
-      .sort((a, b) => a.nama.localeCompare(b.nama));
+      .filter(s => (s?.nama || '').toLowerCase().includes(skpdSearch.toLowerCase()))
+      .sort((a, b) => (a?.nama || '').localeCompare(b?.nama || ''));
   }, [skpds, skpdSearch]);
 
   const filteredAnggarans = useMemo(() => {
-    let result = anggarans;
-    if (selectedSkpdId) result = result.filter(a => a.skpdId === selectedSkpdId);
+    let result = (anggarans || []);
+    if (selectedSkpdId) result = result.filter(a => a?.skpdId === selectedSkpdId);
     if (accountSearch) {
       result = result.filter(a => 
-        a.namaAkun.toLowerCase().includes(accountSearch.toLowerCase()) ||
-        a.kodeAkun.toLowerCase().includes(accountSearch.toLowerCase())
+        (a?.namaAkun || '').toLowerCase().includes(accountSearch.toLowerCase()) ||
+        (a?.kodeAkun || '').toLowerCase().includes(accountSearch.toLowerCase())
       );
     }
     return result;
   }, [anggarans, selectedSkpdId, accountSearch]);
 
   const filteredRealisasis = useMemo(() => {
-    let result = realisasis;
+    let result = (realisasis || []);
     if (selectedSkpdId) {
       result = result.filter(r => {
-        const a = anggarans.find(ang => ang.id === r.anggaranId);
+        const a = (anggarans || []).find(ang => ang?.id === r?.anggaranId);
         return a?.skpdId === selectedSkpdId;
       });
     }
     if (accountSearch) {
       result = result.filter(r => {
-        const a = anggarans.find(ang => ang.id === r.anggaranId);
+        const a = (anggarans || []).find(ang => ang?.id === r?.anggaranId);
         return a && (
-          a.namaAkun.toLowerCase().includes(accountSearch.toLowerCase()) ||
-          a.kodeAkun.toLowerCase().includes(accountSearch.toLowerCase())
+          (a.namaAkun || '').toLowerCase().includes(accountSearch.toLowerCase()) ||
+          (a.kodeAkun || '').toLowerCase().includes(accountSearch.toLowerCase())
         );
       });
     }
@@ -69,15 +69,15 @@ export default function Reports() {
         : skpds;
 
       return targetSkpds.map(skpd => {
-        const pagu = anggarans
-          .filter(a => a.skpdId === skpd.id)
-          .reduce((sum, item) => sum + item.pagu, 0);
-        const realisasi = realisasis
+        const pagu = (anggarans || [])
+          .filter(a => a?.skpdId === skpd?.id)
+          .reduce((sum, item) => sum + (Number(item?.pagu) || 0), 0);
+        const realisasi = (realisasis || [])
           .filter(r => {
-            const a = anggarans.find(ang => ang.id === r.anggaranId);
-            return a?.skpdId === skpd.id;
+            const a = (anggarans || []).find(ang => ang?.id === r?.anggaranId);
+            return a?.skpdId === skpd?.id;
           })
-          .reduce((sum, item) => sum + item.nilai, 0);
+          .reduce((sum, item) => sum + (Number(item?.nilai) || 0), 0);
         return {
           id: skpd.id,
           label: skpd.nama,
@@ -91,20 +91,20 @@ export default function Reports() {
     } else if (type === 'akun' && accountSearch) {
       // Specialized detailed view for account search
       return filteredAnggarans.map(a => {
-        const realisasi = realisasis
-          .filter(r => r.anggaranId === a.id)
-          .reduce((sum, item) => sum + item.nilai, 0);
+        const realisasi = (realisasis || [])
+          .filter(r => r?.anggaranId === a?.id)
+          .reduce((sum, item) => sum + (Number(item?.nilai) || 0), 0);
         
-        const skpd = skpds.find(s => s.id === a.skpdId);
+        const skpd = (skpds || []).find(s => s?.id === a?.skpdId);
         
         return {
-          id: a.id,
-          label: a.namaAkun,
-          sublabel: `${a.kodeAkun} • ${skpd?.nama || 'Unknown SKPD'} • ${a.namaProgram}`,
-          pagu: a.pagu,
+          id: a?.id || '',
+          label: a?.namaAkun || 'Unknown Akun',
+          sublabel: `${a?.kodeAkun || '-'} • ${skpd?.nama || 'Unknown SKPD'} • ${a?.namaProgram || '-'}`,
+          pagu: Number(a?.pagu) || 0,
           realisasi,
-          sisa: a.pagu - realisasi,
-          persen: a.pagu > 0 ? realisasi / a.pagu : 0
+          sisa: Math.max(0, (Number(a?.pagu) || 0) - realisasi),
+          persen: (Number(a?.pagu) || 0) > 0 ? realisasi / (Number(a?.pagu) || 0) : 0
         };
       }).sort((a, b) => b.pagu - a.pagu);
     } else {

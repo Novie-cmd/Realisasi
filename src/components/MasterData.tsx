@@ -211,12 +211,12 @@ export default function MasterData() {
   const filteredAnggarans = React.useMemo(() => anggarans.filter(a => {
     const skpd = skpds.find(s => s.id === a.skpdId);
     const searchLower = search.toLowerCase();
-    return a.namaAkun.toLowerCase().includes(searchLower) || 
-           a.kodeAkun.toLowerCase().includes(searchLower) ||
+    return (a.namaAkun || '').toLowerCase().includes(searchLower) || 
+           (a.kodeAkun || '').toLowerCase().includes(searchLower) ||
            (a.namaProgram || '').toLowerCase().includes(searchLower) ||
            (a.namaKegiatan || '').toLowerCase().includes(searchLower) ||
            (a.namaSubKegiatan || '').toLowerCase().includes(searchLower) ||
-           skpd?.nama.toLowerCase().includes(searchLower);
+           (skpd?.nama || '').toLowerCase().includes(searchLower);
   }), [anggarans, skpds, search]);
 
   const totalItems = tab === 'skpd' ? filteredSkpds.length : filteredAnggarans.length;

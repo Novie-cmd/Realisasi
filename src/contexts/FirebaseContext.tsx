@@ -91,9 +91,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const cachedAnggarans = localStorage.getItem('backup_anggarans');
       const cachedRealisasis = localStorage.getItem('backup_realisasis');
       
-      if (cachedSkpds) setSkpds(JSON.parse(cachedSkpds));
-      if (cachedAnggarans) setAnggarans(JSON.parse(cachedAnggarans));
-      if (cachedRealisasis) setRealisasis(JSON.parse(cachedRealisasis));
+      if (cachedSkpds) {
+        const parsed = JSON.parse(cachedSkpds);
+        if (Array.isArray(parsed)) setSkpds(parsed.filter(Boolean));
+      }
+      if (cachedAnggarans) {
+        const parsed = JSON.parse(cachedAnggarans);
+        if (Array.isArray(parsed)) setAnggarans(parsed.filter(Boolean));
+      }
+      if (cachedRealisasis) {
+        const parsed = JSON.parse(cachedRealisasis);
+        if (Array.isArray(parsed)) setRealisasis(parsed.filter(Boolean));
+      }
     } catch (e) {
       console.warn("Failed to load local backup:", e);
     }
@@ -101,15 +110,27 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   // Save backups on change (including empty states)
   useEffect(() => {
-    localStorage.setItem('backup_skpds', JSON.stringify(skpds));
+    try {
+      localStorage.setItem('backup_skpds', JSON.stringify(skpds));
+    } catch (e) {
+      console.warn("Storage error for SKPD:", e);
+    }
   }, [skpds]);
 
   useEffect(() => {
-    localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
+    try {
+      localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
+    } catch (e) {
+      console.warn("Storage error for Anggaran:", e);
+    }
   }, [anggarans]);
 
   useEffect(() => {
-    localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
+    try {
+      localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
+    } catch (e) {
+      console.warn("Storage error for Realisasi:", e);
+    }
   }, [realisasis]);
 
   const handleAsyncError = (err: any) => {
@@ -185,13 +206,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSkpds(prev => {
-        const map = new Map<string, SKPD>(prev.map(i => [i.id, i]));
+        const map = new Map<string, SKPD>((prev || []).filter(Boolean).map(i => [i.id, i]));
         let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as SKPD;
           if (change.type === 'removed') {
             if (map.delete(data.id)) changed = true;
-          } else {
+          } else if (data && data.id) {
             map.set(data.id, data);
             changed = true;
           }
@@ -217,13 +238,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       setAnggarans(prev => {
-        const map = new Map<string, Anggaran>(prev.map(i => [i.id, i]));
+        const map = new Map<string, Anggaran>((prev || []).filter(Boolean).map(i => [i.id, i]));
         let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as Anggaran;
           if (change.type === 'removed') {
             if (map.delete(data.id)) changed = true;
-          } else {
+          } else if (data && data.id) {
             map.set(data.id, data);
             changed = true;
           }
@@ -249,20 +270,20 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       setRealisasis(prev => {
-        const map = new Map<string, Realisasi>(prev.map(i => [i.id, i]));
+        const map = new Map<string, Realisasi>((prev || []).filter(Boolean).map(i => [i.id, i]));
         let changed = false;
         snapshot.docChanges().forEach((change) => {
           const data = { id: change.doc.id, ...change.doc.data() } as Realisasi;
           if (change.type === 'removed') {
             if (map.delete(data.id)) changed = true;
-          } else {
+          } else if (data && data.id) {
             map.set(data.id, data);
             changed = true;
           }
         });
         // Realisasis should maintain sort order from query
         if (changed) {
-          return Array.from(map.values()).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+          return Array.from(map.values()).sort((a, b) => (b?.tanggal || '').localeCompare(a?.tanggal || ''));
         }
         return prev;
       });
