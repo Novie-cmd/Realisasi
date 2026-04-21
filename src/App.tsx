@@ -183,10 +183,12 @@ export default function App() {
                     <motion.div 
                       className="h-full bg-bento-primary"
                       animate={{ width: `${syncProgress}%` }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ duration: 0.1 }}
                     />
                   </div>
-                  <span className="text-[10px] font-black text-bento-primary w-8">{syncProgress}%</span>
+                  <span className="text-[10px] font-black text-bento-primary w-12 text-right ml-1">
+                    {syncProgress >= 100 ? '100' : syncProgress.toFixed(1)}%
+                  </span>
                 </div>
               </div>
             </motion.div>

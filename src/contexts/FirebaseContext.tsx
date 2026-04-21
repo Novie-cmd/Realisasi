@@ -132,7 +132,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, [quotaExceeded]);
 
   // Save backups on change (including empty states) with shorter debounce for better persistence
+  // Skip during sync to avoid blocking main thread with heavy JSON stringify
   useEffect(() => {
+    if (isSyncing) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('backup_skpds', JSON.stringify(skpds));
@@ -141,9 +143,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [skpds]);
+  }, [skpds, isSyncing]);
 
   useEffect(() => {
+    if (isSyncing) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
@@ -152,9 +155,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [anggarans]);
+  }, [anggarans, isSyncing]);
 
   useEffect(() => {
+    if (isSyncing) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
@@ -163,7 +167,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [realisasis]);
+  }, [realisasis, isSyncing]);
 
   const handleAsyncError = (err: any) => {
     try {
@@ -338,7 +342,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2); // Start with a small boost for UX
+    setSyncProgress(0.5); 
 
     const batchSize = 100; // Smaller size for more frequent UI updates
     const chunks = [];
@@ -355,9 +359,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
+        // Use more granular progress with decimal
+        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(currentProgress);
       }
     } catch (err) {
+      console.error("Bulk SKPD Sync Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
@@ -394,7 +401,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2);
+    setSyncProgress(0.5);
 
     const batchSize = 100;
     const chunks = [];
@@ -410,9 +417,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'skpds', item.id));
         });
         await batch.commit();
-        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
+        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(currentProgress);
       }
     } catch (err) {
+      console.error("Bulk Delete SKPD Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
@@ -455,7 +464,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2);
+    setSyncProgress(0.5);
 
     const batchSize = 100;
     const chunks = [];
@@ -472,9 +481,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
+        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(currentProgress);
       }
     } catch (err) {
+      console.error("Bulk Anggaran Sync Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
@@ -511,7 +522,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2);
+    setSyncProgress(0.5);
 
     const batchSize = 100;
     const chunks = [];
@@ -527,9 +538,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'anggarans', item.id));
         });
         await batch.commit();
-        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
+        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(currentProgress);
       }
     } catch (err) {
+      console.error("Bulk Delete Anggaran Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
@@ -573,7 +586,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2);
+    setSyncProgress(0.5);
 
     const batchSize = 100;
     const chunks = [];
@@ -590,9 +603,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         });
         
         await batch.commit();
-        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
+        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(currentProgress);
       }
     } catch (err) {
+      console.error("Bulk Realisasi Sync Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
@@ -629,7 +644,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2);
+    setSyncProgress(0.5);
 
     const batchSize = 100;
     const chunks = [];
@@ -645,9 +660,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           batch.delete(doc(db, 'realisasis', item.id));
         });
         await batch.commit();
-        setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 100)));
+        const currentProgress = Number(((i + 1) / chunks.length * 100).toFixed(1));
+        setSyncProgress(currentProgress);
       }
     } catch (err) {
+      console.error("Bulk Delete Realisasi Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
@@ -672,7 +689,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsSyncing(true);
-    setSyncProgress(2);
+    setSyncProgress(0.5);
 
     const batchSize = 100;
 
@@ -687,7 +704,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'realisasis', item.id)));
           await batch.commit();
-          setSyncProgress(Math.max(2, Math.round(((i + 1) / chunks.length) * 33))); // First 33%
+          const prog = Number(((i + 1) / chunks.length * 33).toFixed(1));
+          setSyncProgress(prog); // First 33%
         }
       }
 
@@ -700,7 +718,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'anggarans', item.id)));
           await batch.commit();
-          setSyncProgress(Math.max(2, 33 + Math.round(((i + 1) / chunks.length) * 33))); // Up to 66%
+          const prog = Number((33 + (i + 1) / chunks.length * 33).toFixed(1));
+          setSyncProgress(prog); // Up to 66%
         }
       }
 
@@ -713,10 +732,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           const batch = writeBatch(db);
           chunks[i].forEach(item => batch.delete(doc(db, 'skpds', item.id)));
           await batch.commit();
-          setSyncProgress(Math.max(2, 66 + Math.round(((i + 1) / chunks.length) * 34))); // Up to 100%
+          const prog = Number((66 + (i + 1) / chunks.length * 34).toFixed(1));
+          setSyncProgress(prog); // Up to 100%
         }
       }
     } catch (err) {
+      console.error("Clear All Data Sync Error:", err);
       handleAsyncError(err);
     } finally {
       setIsSyncing(false);
