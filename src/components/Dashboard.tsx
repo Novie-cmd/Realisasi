@@ -43,23 +43,38 @@ export default function Dashboard() {
   const chartData = useMemo(() => {
     if (!skpds || skpds.length === 0) return [];
     
+    // Optimasi: Gunakan Map untuk lookup O(1)
+    const skpdAnggaranMap = new Map<string, number>();
+    const skpdRealisasiMap = new Map<string, number>();
+    const anggaranToSkpdMap = new Map<string, string>();
+
+    // Index anggaran -> skpd mapping dan hitung total anggaran per skpd
+    (anggarans || []).forEach(a => {
+      if (!a) return;
+      if (a.skpdId) {
+        skpdAnggaranMap.set(a.skpdId, (skpdAnggaranMap.get(a.skpdId) || 0) + (Number(a.pagu) || 0));
+        anggaranToSkpdMap.set(a.id, a.skpdId);
+      }
+    });
+
+    // Hitung total realisasi per skpd menggunakan mapping anggaran
+    (realisasis || []).forEach(r => {
+      if (!r) return;
+      const skpdId = anggaranToSkpdMap.get(r.anggaranId);
+      if (skpdId) {
+        skpdRealisasiMap.set(skpdId, (skpdRealisasiMap.get(skpdId) || 0) + (Number(r.nilai) || 0));
+      }
+    });
+    
     return skpds.map(skpd => {
-      const skpdAnggaran = (anggarans || [])
-        .filter(a => a?.skpdId === skpd?.id)
-        .reduce((sum, item) => sum + (Number(item?.pagu) || 0), 0);
-      
-      const skpdRealisasi = (realisasis || [])
-        .filter(r => {
-          const anggaran = (anggarans || []).find(a => a?.id === r?.anggaranId);
-          return anggaran?.skpdId === skpd?.id;
-        })
-        .reduce((sum, item) => sum + (Number(item?.nilai) || 0), 0);
+      const Anggaran = skpdAnggaranMap.get(skpd.id) || 0;
+      const Realisasi = skpdRealisasiMap.get(skpd.id) || 0;
 
       return {
         nama: skpd?.nama || 'Unknown',
-        Anggaran: skpdAnggaran,
-        Realisasi: skpdRealisasi,
-        Sisa: Math.max(0, skpdAnggaran - skpdRealisasi)
+        Anggaran,
+        Realisasi,
+        Sisa: Math.max(0, Anggaran - Realisasi)
       };
     }).sort((a, b) => (b.Anggaran || 0) - (a.Anggaran || 0)).slice(0, 5);
   }, [skpds, anggarans, realisasis]);
@@ -67,20 +82,22 @@ export default function Dashboard() {
   const pieData = useMemo(() => {
     if (!realisasis || !anggarans) return [];
     
+    // Optimasi: Pre-map anggaran untuk lookup cepat
+    const anggaranMap = new Map<string, Anggaran>((anggarans || []).filter(Boolean).map(a => [a.id, a]));
     const data: Record<string, number> = {};
+
     realisasis.forEach(r => {
-      const anggaran = anggarans.find(a => a?.id === r?.anggaranId);
+      if (!r) return;
+      const anggaran = anggaranMap.get(r.anggaranId);
       if (anggaran && anggaran.namaAkun) {
-        data[anggaran.namaAkun] = (data[anggaran.namaAkun] || 0) + (r?.nilai || 0);
+        data[anggaran.namaAkun] = (data[anggaran.namaAkun] || 0) + (Number(r.nilai) || 0);
       }
     });
 
-    const result = Object.entries(data)
+    return Object.entries(data)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
-    
-    return result;
   }, [realisasis, anggarans]);
 
   return (

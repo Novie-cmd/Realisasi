@@ -63,21 +63,34 @@ export default function Reports() {
   }, [realisasis, anggarans, selectedSkpdId, accountSearch]);
 
   const reportData = useMemo(() => {
+    // Optimasi: Buat lookup maps di awal agar tidak ada O(N^2)
+    const anggaranMap = new Map<string, Anggaran>((anggarans || []).filter(Boolean).map(a => [a.id, a]));
+    const skpdAnggaranMap = new Map<string, number>();
+    const skpdRealisasiMap = new Map<string, number>();
+    const anggaranToSkpdId = new Map<string, string>();
+
+    (anggarans || []).forEach(a => {
+      if (!a) return;
+      skpdAnggaranMap.set(a.skpdId, (skpdAnggaranMap.get(a.skpdId) || 0) + (Number(a.pagu) || 0));
+      anggaranToSkpdId.set(a.id, a.skpdId);
+    });
+
+    (realisasis || []).forEach(r => {
+      if (!r) return;
+      const sid = anggaranToSkpdId.get(r.anggaranId);
+      if (sid) {
+        skpdRealisasiMap.set(sid, (skpdRealisasiMap.get(sid) || 0) + (Number(r.nilai) || 0));
+      }
+    });
+
     if (type === 'skpd') {
       const targetSkpds = selectedSkpdId 
         ? skpds.filter(s => s.id === selectedSkpdId)
         : skpds;
 
       return targetSkpds.map(skpd => {
-        const pagu = (anggarans || [])
-          .filter(a => a?.skpdId === skpd?.id)
-          .reduce((sum, item) => sum + (Number(item?.pagu) || 0), 0);
-        const realisasi = (realisasis || [])
-          .filter(r => {
-            const a = (anggarans || []).find(ang => ang?.id === r?.anggaranId);
-            return a?.skpdId === skpd?.id;
-          })
-          .reduce((sum, item) => sum + (Number(item?.nilai) || 0), 0);
+        const pagu = skpdAnggaranMap.get(skpd.id) || 0;
+        const realisasi = skpdRealisasiMap.get(skpd.id) || 0;
         return {
           id: skpd.id,
           label: skpd.nama,
@@ -130,11 +143,11 @@ export default function Reports() {
         }
 
         if (!groups[label]) groups[label] = { pagu: 0, realisasi: 0, kode: kode };
-        groups[label].pagu += a.pagu;
+        groups[label].pagu += (Number(a.pagu) || 0);
       });
 
       filteredRealisasis.forEach(r => {
-        const a = anggarans.find(ang => ang.id === r.anggaranId);
+        const a = anggaranMap.get(r.anggaranId);
         if (a) {
           let label = '';
           if (type === 'program') label = a.namaProgram || 'No Program';
@@ -143,7 +156,7 @@ export default function Reports() {
           else if (type === 'akun') label = a.namaAkun || 'No Rekening';
 
           if (groups[label]) {
-            groups[label].realisasi += r.nilai;
+            groups[label].realisasi += (Number(r.nilai) || 0);
           }
         }
       });

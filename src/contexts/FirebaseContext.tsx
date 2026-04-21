@@ -108,29 +108,38 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Save backups on change (including empty states)
+  // Save backups on change (including empty states) with simple debounce to prevent lag
   useEffect(() => {
-    try {
-      localStorage.setItem('backup_skpds', JSON.stringify(skpds));
-    } catch (e) {
-      console.warn("Storage error for SKPD:", e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('backup_skpds', JSON.stringify(skpds));
+      } catch (e) {
+        console.warn("Storage error for SKPD:", e);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [skpds]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
-    } catch (e) {
-      console.warn("Storage error for Anggaran:", e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('backup_anggarans', JSON.stringify(anggarans));
+      } catch (e) {
+        console.warn("Storage error for Anggaran:", e);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [anggarans]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
-    } catch (e) {
-      console.warn("Storage error for Realisasi:", e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('backup_realisasis', JSON.stringify(realisasis));
+      } catch (e) {
+        console.warn("Storage error for Realisasi:", e);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [realisasis]);
 
   const handleAsyncError = (err: any) => {
