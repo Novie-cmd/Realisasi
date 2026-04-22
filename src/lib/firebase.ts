@@ -3,6 +3,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User 
 import { 
   getFirestore, 
   enableMultiTabIndexedDbPersistence,
+  terminate,
+  clearIndexedDbPersistence,
+  waitForPendingWrites,
   doc, 
   getDocFromServer, 
   collection, 
@@ -19,6 +22,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
+export { terminate, clearIndexedDbPersistence, waitForPendingWrites };
 
 // Enable offline persistence
 enableMultiTabIndexedDbPersistence(db).catch((err) => {

@@ -16,7 +16,7 @@ import {
   writeBatch,
   getDocFromServer
 } from 'firebase/firestore';
-import { auth, db, googleProvider, handleFirestoreError } from '../lib/firebase';
+import { auth, db, googleProvider, handleFirestoreError, terminate, clearIndexedDbPersistence, waitForPendingWrites } from '../lib/firebase';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
 
 interface FirebaseContextType {
@@ -45,9 +45,14 @@ interface FirebaseContextType {
   deleteAllSKPDs: () => Promise<void>;
   deleteAllAnggarans: () => Promise<void>;
   clearAllData: () => Promise<void>;
+  deleteAnggaranAndRealisasi: () => Promise<void>;
   resetQuotaStatus: () => void;
+  clearOfflineQueue: () => Promise<void>;
+  recheckQuota: () => Promise<void>;
   setSyncError: (error: string | null) => void;
   dbReady: boolean;
+  hasPendingUpdates: boolean;
+  isReconnecting: boolean;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -108,7 +113,28 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [dbReady, setDbReady] = useState(false);
+  const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
   const quotaRef = React.useRef(quotaExceeded);
+
+  // Periodic check for pending writes to warn user about console logs
+  useEffect(() => {
+    if (!dbReady) return;
+    
+    const checkPending = async () => {
+      try {
+        // waitForPendingWrites with 500ms timeout
+        await waitForPendingWrites(db);
+        setHasPendingUpdates(false);
+      } catch (e) {
+        // If it throws, it means there are pending writes (timeout)
+        setHasPendingUpdates(true);
+      }
+    };
+
+    const interval = setInterval(checkPending, 5000);
+    checkPending();
+    return () => clearInterval(interval);
+  }, [dbReady]);
 
   // Sync ref with state
   useEffect(() => {
@@ -827,16 +853,101 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     setSyncError(null);
   };
 
+  const deleteAnggaranAndRealisasi = async () => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus SEMUA data Anggaran dan Realisasi? Data SKPD akan tetap dipertahankan.")) return;
+    
+    // Local clear for instant responsiveness
+    setAnggarans([]);
+    setRealisasis([]);
+    localStorage.removeItem('backup_anggarans');
+    localStorage.removeItem('backup_realisasis');
+
+    if (quotaRef.current) {
+      setSyncError("Peringatan: Kuota habis. Data lokal dibersihkan, penghapusan di cloud ditunda.");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const batchSize = 100;
+      
+      // Delete Realisasis in batches
+      const rlCopy = [...realisasis];
+      for (let i = 0; i < rlCopy.length; i += batchSize) {
+        if (quotaRef.current) break;
+        const batch = writeBatch(db);
+        rlCopy.slice(i, i + batchSize).forEach(res => batch.delete(doc(db, 'realisasis', res.id)));
+        await batch.commit();
+      }
+
+      // Delete Anggarans in batches
+      const agCopy = [...anggarans];
+      for (let i = 0; i < agCopy.length; i += batchSize) {
+        if (quotaRef.current) break;
+        const batch = writeBatch(db);
+        agCopy.slice(i, i + batchSize).forEach(res => batch.delete(doc(db, 'anggarans', res.id)));
+        await batch.commit();
+      }
+      alert("Pembersihan database selesai (Anggaran & Realisasi).");
+    } catch (err: any) {
+      handleAsyncError(err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const clearOfflineQueue = async () => {
+    if (!window.confirm("PERINGATAN: Ini akan menghapus data yang belum sempat terunggah ke cloud (Data yang diinput saat offline/kuota habis). Gunakan ini hanya jika log error terus muncul dan Anda ingin membersihkan antrean. Lanjutkan?")) {
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      await terminate(db);
+      await clearIndexedDbPersistence(db);
+      alert("Antrean offline telah dibersihkan. Silakan muat ulang halaman (Refresh) untuk menyambung kembali.");
+      window.location.reload();
+    } catch (err: any) {
+      console.error("Failed to clear persistence:", err);
+      alert("Gagal membersihkan data: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const recheckQuota = async () => {
+    setIsReconnecting(true);
+    setSyncError("Sedang mengetes koneksi database...");
+    try {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+      resetQuotaStatus();
+      alert("Database Terhubung! Kuota telah tersedia kembali.");
+    } catch (err: any) {
+      if (err.code === 'resource-exhausted' || err.message?.includes('quota')) {
+        setQuotaExceeded(true);
+        setSyncError("Kuota masih penuh. Silakan coba lagi nanti.");
+      } else {
+        console.error("Test failed:", err);
+        setSyncError("Gagal terhubung: " + err.message);
+      }
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
+
   return (
     <FirebaseContext.Provider value={{ 
       user, loading, syncError, dataLoading, skpds, anggarans, realisasis, quotaExceeded,
-      isSyncing, syncProgress,
+      isSyncing, syncProgress, hasPendingUpdates, isReconnecting,
       login, logout, 
       saveSKPD, saveSKPDsBulk, deleteSKPD, deleteAllSKPDs,
       saveAnggaran, saveAnggaransBulk, deleteAnggaran, deleteAllAnggarans,
       saveRealisasi, saveRealisasisBulk, deleteRealisasi, deleteAllRealisasi,
       clearAllData,
+      deleteAnggaranAndRealisasi,
       resetQuotaStatus,
+      clearOfflineQueue,
+      recheckQuota,
       setSyncError,
       dbReady
     }}>

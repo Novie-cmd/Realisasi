@@ -36,3 +36,9 @@ export const generateId = () => {
   }
   return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 };
+
+export const generateStableId = (seed: string) => {
+  // Simple non-cryptographic stable ID based on input string
+  // Remove spaces and special chars to make it a clean Firestore ID
+  return "sid_" + seed.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 100);
+};

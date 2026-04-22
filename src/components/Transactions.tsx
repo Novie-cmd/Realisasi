@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SKPD, Anggaran, Realisasi } from '../lib/types';
-import { formatIDR, cn, generateId } from '../lib/utils';
+import { formatIDR, cn, generateId, generateStableId } from '../lib/utils';
 import { format, isValid, parse } from 'date-fns';
 import { useFirebase } from '../contexts/FirebaseContext';
 
@@ -149,8 +149,11 @@ export default function Transactions() {
                 }
               }
 
+              // Generate stable ID to prevent duplicates during re-import
+              const seed = `${row.skpd_kode}_${row.kode_akun}_${amount}_${dateStr}_${String(row.keterangan || '').trim()}`.toLowerCase();
+
               return {
-                id: generateId(),
+                id: generateStableId(`rel_${seed}`),
                 anggaranId: anggaran.id,
                 tanggal: dateStr,
                 nilai: amount,

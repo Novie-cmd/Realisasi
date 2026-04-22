@@ -33,8 +33,8 @@ type Page = 'dashboard' | 'master' | 'transactions' | 'reports';
 export default function App() {
   const { 
     user, loading, syncError, skpds, anggarans, realisasis, quotaExceeded,
-    isSyncing, syncProgress, dbReady,
-    login, logout, setSyncError, resetQuotaStatus,
+    isSyncing, syncProgress, dbReady, hasPendingUpdates, isReconnecting,
+    login, logout, setSyncError, resetQuotaStatus, recheckQuota, clearOfflineQueue,
     saveSKPD, deleteSKPD,
     saveAnggaran, saveAnggaransBulk, deleteAnggaran,
     saveRealisasi, saveRealisasisBulk, deleteRealisasi
@@ -211,7 +211,7 @@ export default function App() {
 
         {syncError && (
           <div className={cn(
-            "border-b px-10 py-3 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-300",
+            "border-b px-10 py-3 flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-300",
             quotaExceeded ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
           )}>
             <div className="flex items-center gap-3">
@@ -219,45 +219,55 @@ export default function App() {
                 "w-2 h-2 rounded-full animate-pulse",
                 quotaExceeded ? "bg-amber-500" : "bg-red-500"
               )}></div>
-              <p className={cn(
-                "text-sm font-bold",
-                quotaExceeded ? "text-amber-700" : "text-red-700"
-              )}>{syncError}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {quotaExceeded && (
-                <button 
-                  onClick={resetQuotaStatus}
-                  className="px-3 py-1.5 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-colors shadow-sm mr-2"
-                >
-                  Coba Sinkron Ulang
-                </button>
-              )}
-              <button 
-                onClick={() => setSyncError(null)}
-                className={cn(
-                  "p-1.5 transition-colors",
-                  quotaExceeded ? "text-amber-400 hover:text-amber-700" : "text-red-400 hover:text-red-700"
+              <div className="space-y-1">
+                <p className={cn(
+                  "text-sm font-bold",
+                  quotaExceeded ? "text-amber-700" : "text-red-700"
+                )}>{syncError}</p>
+                {quotaExceeded && hasPendingUpdates && (
+                   <p className="text-[10px] text-amber-600 font-medium">
+                     Terdapat antrean data yang belum tersinkron. Database (SDK) akan terus mencoba mengirim data ini secara berkala, yang menyebabkan pesan error muncul di konsol hingga kuota direset.
+                   </p>
                 )}
-                title="Sembunyikan Pesan"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {quotaExceeded ? (
-                <button 
-                  onClick={() => resetQuotaStatus()}
-                  className="px-3 py-1 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-amber-700 transition-all ml-2"
-                >
-                  Coba Hubungkan Sekarang
-                </button>
+                <>
+                  <button 
+                    onClick={recheckQuota}
+                    disabled={isReconnecting}
+                    className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isReconnecting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                    Tes Koneksi
+                  </button>
+                  <button 
+                    onClick={clearOfflineQueue}
+                    className="px-3 py-1.5 bg-white border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-50 transition-all shadow-sm"
+                  >
+                    Bersihkan Antrean
+                  </button>
+                </>
               ) : (
                 <button 
                   onClick={() => window.location.reload()}
-                  className="px-3 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-all ml-2"
+                  className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-red-700 transition-all shadow-sm"
                 >
-                  Coba Lagi
+                  Segarkan Halaman
                 </button>
               )}
+              
+              <button 
+                onClick={() => setSyncError(null)}
+                className={cn(
+                  "p-1.5 transition-colors rounded-lg",
+                  quotaExceeded ? "text-amber-400 hover:bg-amber-100" : "text-red-400 hover:bg-red-100"
+                )}
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}

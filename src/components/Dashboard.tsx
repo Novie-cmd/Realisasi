@@ -29,7 +29,11 @@ import { useFirebase } from '../contexts/FirebaseContext';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function Dashboard() {
-  const { skpds, anggarans, realisasis, quotaExceeded, resetQuotaStatus, clearAllData } = useFirebase();
+  const { 
+    skpds, anggarans, realisasis, quotaExceeded, 
+    resetQuotaStatus, clearAllData, deleteAnggaranAndRealisasi,
+    hasPendingUpdates, clearOfflineQueue
+  } = useFirebase();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const stats = useMemo(() => {
     if (!anggarans || !realisasis) return { totalAnggaran: 0, totalRealisasi: 0, totalSisa: 0, persentase: 0 };
@@ -109,20 +113,46 @@ export default function Dashboard() {
           <h2 className="text-2xl font-black text-bento-accent tracking-tighter uppercase">Executive Dashboard</h2>
           <p className="text-xs text-bento-text-sub font-bold uppercase tracking-widest mt-1">Sistem Informasi Realisasi Anggaran 2026</p>
         </div>
-        <button 
-          onClick={async () => {
-            if (window.confirm('PERINGATAN KRITIKAL: Apakah Anda yakin ingin menghapus SELURUH data sistem (SKPD, Anggaran, & Realisasi)? Tindakan ini permanen dan tidak dapat dibatalkan.')) {
+        <div className="flex flex-wrap gap-2">
+          {hasPendingUpdates && (
+            <button 
+              onClick={() => clearOfflineQueue()}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all shadow-sm"
+              title="Bersihkan antrean data yang gagal sinkron"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Bersihkan Antrean
+            </button>
+          )}
+
+          <button 
+            onClick={async () => {
               setIsDeleting(true);
-              await clearAllData();
+              await deleteAnggaranAndRealisasi();
               setIsDeleting(false);
-            }
-          }}
-          disabled={isDeleting || (skpds.length === 0 && anggarans.length === 0)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-bento-danger rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span>{isDeleting ? 'Menghapus...' : 'Kosongkan Database'}</span>
-        </button>
+            }}
+            disabled={isDeleting || (anggarans.length === 0 && realisasis.length === 0)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm disabled:opacity-30"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Hapus Anggaran & Realisasi
+          </button>
+
+          <button 
+            onClick={async () => {
+              if (window.confirm('PERINGATAN KRITIKAL: Ini akan menghapus TOTAL seluruh data (termasuk SKPD). Lanjutkan?')) {
+                setIsDeleting(true);
+                await clearAllData();
+                setIsDeleting(false);
+              }
+            }}
+            disabled={isDeleting || (skpds.length === 0 && anggarans.length === 0)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md disabled:opacity-30"
+          >
+            <Database className="w-3.5 h-3.5" />
+            Kosongkan Total Database
+          </button>
+        </div>
       </div>
 
       {quotaExceeded && (

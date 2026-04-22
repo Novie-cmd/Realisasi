@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SKPD, Anggaran } from '../lib/types';
-import { cn, formatIDR, generateId } from '../lib/utils';
+import { cn, formatIDR, generateId, generateStableId } from '../lib/utils';
 import { useFirebase } from '../contexts/FirebaseContext';
 
 const ITEMS_PER_PAGE = 50;
@@ -63,7 +63,7 @@ export default function MasterData() {
             })
             .filter((row: any) => row.kode != null && row.nama != null)
             .map((row: any) => ({
-              id: generateId(),
+              id: generateStableId(`skpd_${row.kode}`),
               kode: String(row.kode).trim(),
               nama: String(row.nama).trim(),
             }));
@@ -168,8 +168,10 @@ export default function MasterData() {
 
               if (isNaN(amount)) amount = 0;
 
+              const seed = `${row.skpd_kode}_${row.kode_akun}_${row.kode_sub || ''}`.toLowerCase();
+
               return {
-                id: generateId(),
+                id: generateStableId(`ang_${seed}`),
                 skpdId: skpd?.id || '',
                 kodeProgram: String(row.kode_program || '').trim(),
                 namaProgram: String(row.program || '').trim(),
